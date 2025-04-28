@@ -10,16 +10,16 @@ use crate::metrics::Metrics;
 /// Serves `/healthz`, `/version`, `/metrics`, and `/:code` endpoints.
 use axum::{
     body::Body,
-    extract::{Extension, Path},
+    extract::{Extension, Path, Query},
     http::{header, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::get,
     Router,
 };
 use tokio::fs;
-use tower_http::services::ServeDir;
 use std::{net::SocketAddr, time::Instant};
 use prometheus::{Encoder, TextEncoder};
+use serde::Deserialize;
 
 /// Internal application state
 #[derive(Clone)]
@@ -35,10 +35,11 @@ fn create_app(cache: RouterCache, metrics: Metrics, version: String) -> Router<(
     Router::new()
         .route("/healthz", get(healthz_handler))
         .route("/version", get(version_handler))
+        .route("/available", get(available_handler))
         .route("/metrics", get(metrics_handler))
         .route("/", get(root_handler))
+        .route("/static", get(root_handler))
         .route("/:code", get(redirect_handler))
-        .nest_service("/static", ServeDir::new("static_html"))
         .layer(Extension(state))
 }
 
@@ -78,6 +79,24 @@ async fn root_handler() -> impl IntoResponse {
             .status(StatusCode::NOT_FOUND)
             .body(Body::empty())
             .unwrap(),
+    }
+}
+
+/// Available endpoint: tells whether a shortcode is unused.
+#[derive(Deserialize)]
+struct AvailableParams {
+    /// The shortcode to check.
+    code: String,
+}
+
+async fn available_handler(
+    Extension(state): Extension<AppState>,
+    Query(params): Query<AvailableParams>,
+) -> impl IntoResponse {
+    if state.cache.lookup(&params.code).is_none() {
+        "true"
+    } else {
+        "false"
     }
 }
 
@@ -150,5 +169,39 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = to_bytes(response.into_body()).await.unwrap();
         assert_eq!(&body[..], b"vX.Y");
+    }
+    
+    #[tokio::test]
+    async fn test_available_unused() {
+        let mut map = HashMap::new();
+        map.insert("foo".to_string(), "http://example.com".to_string());
+        let cache = RouterCache::new(map);
+        let metrics = init_metrics();
+        let app = create_app(cache, metrics, "1.0".to_string());
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri("/available?code=bar").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body()).await.unwrap();
+        assert_eq!(&body[..], b"true");
+    }
+
+    #[tokio::test]
+    async fn test_available_used() {
+        let mut map = HashMap::new();
+        map.insert("foo".to_string(), "http://example.com".to_string());
+        let cache = RouterCache::new(map);
+        let metrics = init_metrics();
+        let app = create_app(cache, metrics, "1.0".to_string());
+        let response = app
+            .clone()
+            .oneshot(Request::builder().uri("/available?code=foo").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let body = to_bytes(response.into_body()).await.unwrap();
+        assert_eq!(&body[..], b"false");
     }
 }

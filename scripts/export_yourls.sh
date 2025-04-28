@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Check for mysql CLI
-if ! command -v mysql >/dev/null; then
-    echo "Error: mysql client not found. Please install MySQL client (e.g., apt install mysql-client)." >&2
-    exit 1
+# Check for docker exec fallback or mysql CLI
+DB_CMD=()
+if [[ -n "${YOURLS_DOCKER_CONTAINER:-}" ]]; then
+    # Use mysql inside Docker container
+    if ! command -v docker >/dev/null; then
+        echo "Error: docker not found; cannot exec into container $YOURLS_DOCKER_CONTAINER" >&2
+        exit 1
+    fi
+    DB_CMD=(docker exec -i "$YOURLS_DOCKER_CONTAINER" mysql)
+else
+    # Use local mysql client via TCP
+    if ! command -v mysql >/dev/null; then
+        echo "Error: mysql client not found. Install mysql-client or set YOURLS_DOCKER_CONTAINER." >&2
+        exit 1
+    fi
+    DB_CMD=(mysql --protocol=TCP -h "$YOURLS_DB_HOST" -P "$YOURLS_DB_PORT" -u "$YOURLS_DB_USER" -p"$YOURLS_DB_PASS")
 fi
 
 # Export YOURLS mappings to a YAML file suitable for Redirective
@@ -22,11 +34,9 @@ fi
 : "${YOURLS_DB_NAME:?Need YOURLS_DB_NAME}"
 : "${YOURLS_DB_PORT:=3306}"
 
-# Query the yourls_url table: keyword, url, and title columns
-mysql -h "$YOURLS_DB_HOST" -P "$YOURLS_DB_PORT" \
-      -u "$YOURLS_DB_USER" -p"$YOURLS_DB_PASS" \
-      "$YOURLS_DB_NAME" \
-      -Nse "SELECT keyword, url, IFNULL(title, '') FROM yourls_url ORDER BY keyword;" |
+### Query and export
+"${DB_CMD[@]}" "$YOURLS_DB_NAME" -Nse \
+    "SELECT keyword, url, IFNULL(title, '') FROM yourls_url ORDER BY keyword;" |
 while IFS=$'\t' read -r key url title; do
     # Output as YAML mapping, append title as comment if present
     if [[ -n "$title" ]]; then
