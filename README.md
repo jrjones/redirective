@@ -1,16 +1,19 @@
- # Redirective
- Redirective is a stateless Rust micro-service that maps short codes to full URLs using an in-memory table sourced from a Git-backed YAML file. It exposes three HTTP endpoints:
+# Redirective
+Redirective is a stateless Rust micro-service that maps short codes to full URLs using an in-memory table sourced from a Git-backed YAML file. It exposes three HTTP endpoints:
  - `GET /{code}`: 302 redirect to the target URL if found, otherwise 404.
  - `GET /healthz`: health check endpoint.
  - `GET /version`: service version endpoint.
- Features:
+
+Features:
  - Thread-safe, lock-free reads with `ArcSwap`.
  - Hot-reload of mappings on file changes via Git sync daemon.
  - Prometheus metrics and structured JSON logging.
- ## Configuration
+ 
+## Configuration
  - `links.yaml`: contains mappings from codes to URLs. Example provided.
  - `redirective.toml`: service settings (bind address, reload interval, TLS paths).
- ## Development
+ 
+## Development
 ## Utilities
 
 ### Exporting from YOURLS
