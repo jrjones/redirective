@@ -1,0 +1,6 @@
+ # redirective.toml - service settings
+ address = "0.0.0.0:8080"
+ reload_interval_secs = 60
+ # TLS settings (optional, not in MVP)
+ # cert_path = "/path/to/fullchain.pem"
+ # key_path = "/path/to/privkey.pem"

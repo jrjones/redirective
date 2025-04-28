@@ -1,0 +1,36 @@
+# Rust build directory
+/target/
+**/*.rs.bk
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sw?
+*.sublime-workspace
+*.sublime-project
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Temporary files
+/tmp/
+*.log
+*.tmp
+*.bak
+
+# Cargo specific
+/.cargo/
+/Cargo.lock
+
+# Node.js projects (if any scripting)
+/node_modules/
+
+# Backup files
+*~

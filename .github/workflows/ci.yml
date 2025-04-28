@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Cache cargo registry
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: rustfmt check
+        run: cargo fmt -- --check
+      - name: clippy check
+        run: cargo clippy --all-targets -- -D warnings
+      - name: run tests
+        run: cargo test -- --nocapture
+      - name: audit dependencies
+        uses: actions-rs/audit-check@v1
+      - name: build release
+        run: cargo build --release
+      - name: build Docker image
+        run: docker build . --file Dockerfile --tag redirective:latest
+      - name: start redirective container
+        run: |
+          docker run -d --name redirective_test -p 8080:8080 redirective:latest
+      - name: wait for service to start
+        run: sleep 5
+      - name: healthz smoke-test
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/healthz)
+          if [ "$status" != "200" ]; then echo "healthz returned $status"; exit 1; fi
+      - name: redirect smoke-test
+        run: |
+          status=$(curl -s -o /dev/null -w "%{http_code}" -I http://localhost:8080/foo)
+          if [ "$status" != "302" ]; then echo "expected 302 for /foo, got $status"; exit 1; fi
+          location=$(curl -s -D - http://localhost:8080/foo | grep Location | awk '{print $2}')
+          if [ "$location" != "https://example.com/foo" ]; then echo "location mismatch: $location"; exit 1; fi
+      - name: stop redirective container
+        run: docker stop redirective_test
