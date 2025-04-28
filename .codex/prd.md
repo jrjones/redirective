@@ -26,11 +26,11 @@ sequenceDiagram
     else not found
         Redirective-->>client: 404
     end
- ``````   
+ ```   
     
     
 sequenceDiagram
-``````
+```
     Git Sync Daemon->>Origin Repo: git pull
     Note over Git Sync Daemon: if links.yaml changed
     Git Sync Daemon->>Config Loader: parse / validate
