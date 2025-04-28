@@ -11,7 +11,8 @@ jobs:
     # Grant the GITHUB_TOKEN permission to report security events (required by audit-check)
     permissions:
       contents: read
-      security-events: write
+      security_events: write
+      checks: write
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
