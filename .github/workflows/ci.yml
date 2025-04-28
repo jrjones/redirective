@@ -42,6 +42,14 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: build release
         run: cargo build --release
+      - name: Checkout links repo
+        uses: actions/checkout@v3
+        with:
+          repository: jrjones/redirective-links
+          token: ${{ secrets.LINKS_REPO_TOKEN }}
+          path: links
+      - name: Copy links.yaml into workspace
+        run: cp links/links.yaml links.yaml
       - name: build Docker image
         run: docker build . --file Dockerfile --tag redirective:latest
       - name: start redirective container
