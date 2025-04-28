@@ -1,7 +1,7 @@
 //! metrics module: Prometheus metrics for redirective service.
 
+use prometheus::{HistogramVec, IntCounter, IntCounterVec, Registry};
 use std::sync::Arc;
-use prometheus::{IntCounter, IntCounterVec, HistogramVec, Registry};
 
 /// Prometheus metrics handles.
 #[derive(Clone)]
@@ -44,20 +44,14 @@ pub fn init_metrics() -> Metrics {
         .register(Box::new(redirect_latency.clone()))
         .expect("failed to register redirect_latency");
     // Counter of successful reloads
-    let reload_success = IntCounter::new(
-        "reload_success",
-        "Counter of successful config reloads",
-    )
-    .expect("failed to create reload_success metric");
+    let reload_success = IntCounter::new("reload_success", "Counter of successful config reloads")
+        .expect("failed to create reload_success metric");
     registry
         .register(Box::new(reload_success.clone()))
         .expect("failed to register reload_success");
     // Counter of failed reloads
-    let reload_fail = IntCounter::new(
-        "reload_fail",
-        "Counter of failed config reloads",
-    )
-    .expect("failed to create reload_fail metric");
+    let reload_fail = IntCounter::new("reload_fail", "Counter of failed config reloads")
+        .expect("failed to create reload_fail metric");
     registry
         .register(Box::new(reload_fail.clone()))
         .expect("failed to register reload_fail");
@@ -79,7 +73,10 @@ mod tests {
         let metrics = init_metrics();
         // Use each metric at least once to ensure it's emitted
         let _ = metrics.redirect_total.with_label_values(&["x"]);
-        metrics.redirect_latency.with_label_values(&["x"]).observe(0.0);
+        metrics
+            .redirect_latency
+            .with_label_values(&["x"])
+            .observe(0.0);
         metrics.reload_success.inc();
         metrics.reload_fail.inc();
         let families = metrics.registry.gather();
@@ -89,7 +86,11 @@ mod tests {
         assert!(names.contains(&"reload_success"));
         assert!(names.contains(&"reload_fail"));
         // Histogram produces bucket, sum, and count families
-        assert!(names.iter().any(|n| n.starts_with("redirect_latency_seconds")));
+        assert!(
+            names
+                .iter()
+                .any(|n| n.starts_with("redirect_latency_seconds"))
+        );
     }
 
     #[test]
@@ -106,7 +107,9 @@ mod tests {
         // Ensure there is at least one metric with the label 'code'='x'
         let metrics_vec = family.get_metric();
         assert!(metrics_vec.iter().any(|m| {
-            m.get_label().iter().any(|l| l.name() == "code" && l.value() == "x")
+            m.get_label()
+                .iter()
+                .any(|l| l.name() == "code" && l.value() == "x")
         }));
     }
 }

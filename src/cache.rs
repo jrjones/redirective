@@ -1,8 +1,8 @@
 //! cache module: maintains thread-safe router cache.
 
+use arc_swap::ArcSwap;
 use std::collections::HashMap;
 use std::sync::Arc;
-use arc_swap::ArcSwap;
 
 /// Thread-safe cache for URL redirects.
 #[derive(Clone)]
@@ -14,7 +14,9 @@ impl RouterCache {
     /// Create a new RouterCache with initial mappings.
     pub fn new(initial: HashMap<String, String>) -> Self {
         let swap = ArcSwap::new(Arc::new(initial));
-        RouterCache { inner: Arc::new(swap) }
+        RouterCache {
+            inner: Arc::new(swap),
+        }
     }
 
     /// Lookup a code in the cache, returning the target URL if found.

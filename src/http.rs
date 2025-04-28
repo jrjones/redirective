@@ -9,17 +9,17 @@ use crate::metrics::Metrics;
 ///
 /// Serves `/healthz`, `/version`, `/metrics`, and `/:code` endpoints.
 use axum::{
+    Router,
     body::Body,
     extract::{Extension, Path, Query},
-    http::{header, StatusCode},
+    http::{StatusCode, header},
     response::{IntoResponse, Redirect, Response},
     routing::get,
-    Router,
 };
-use tokio::fs;
-use std::{net::SocketAddr, time::Instant};
 use prometheus::{Encoder, TextEncoder};
 use serde::Deserialize;
+use std::{net::SocketAddr, time::Instant};
+use tokio::fs;
 
 /// Internal application state
 #[derive(Clone)]
@@ -31,7 +31,11 @@ struct AppState {
 
 /// Build the Axum application with routes and shared state.
 fn create_app(cache: RouterCache, metrics: Metrics, version: String) -> Router<()> {
-    let state = AppState { cache, metrics, version };
+    let state = AppState {
+        cache,
+        metrics,
+        version,
+    };
     Router::new()
         .route("/healthz", get(healthz_handler))
         .route("/version", get(version_handler))
@@ -61,20 +65,18 @@ async fn metrics_handler(Extension(state): Extension<AppState>) -> impl IntoResp
     encoder.encode(&metric_families, &mut buffer).unwrap();
     // Copy content type to owned String
     let content_type = encoder.format_type().to_string();
-    ([ (header::CONTENT_TYPE, content_type) ], buffer)
+    ([(header::CONTENT_TYPE, content_type)], buffer)
 }
 
 /// Serve the root index.html from ./static_html
 async fn root_handler() -> impl IntoResponse {
     let path = "static_html/index.html";
     match fs::read_to_string(path).await {
-        Ok(html) => {
-            Response::builder()
-                .status(StatusCode::OK)
-                .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-                .body(Body::from(html))
-                .unwrap()
-        }
+        Ok(html) => Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
+            .body(Body::from(html))
+            .unwrap(),
         Err(_) => Response::builder()
             .status(StatusCode::NOT_FOUND)
             .body(Body::empty())
@@ -107,9 +109,17 @@ async fn redirect_handler(
 ) -> impl IntoResponse {
     let start = Instant::now();
     if let Some(url) = state.cache.lookup(&code) {
-        state.metrics.redirect_total.with_label_values(&[&code]).inc();
+        state
+            .metrics
+            .redirect_total
+            .with_label_values(&[&code])
+            .inc();
         let elapsed = start.elapsed().as_secs_f64();
-        state.metrics.redirect_latency.with_label_values(&[&code]).observe(elapsed);
+        state
+            .metrics
+            .redirect_latency
+            .with_label_values(&[&code])
+            .observe(elapsed);
         Redirect::temporary(&url).into_response()
     } else {
         StatusCode::NOT_FOUND.into_response()
@@ -135,10 +145,10 @@ pub async fn run_http_server(
 mod tests {
     use super::*;
     use crate::metrics::init_metrics;
-    use std::collections::HashMap;
     use axum::body::Body;
     use axum::http::Request;
     use hyper::body::to_bytes;
+    use std::collections::HashMap;
     use tower::ServiceExt;
 
     #[tokio::test]
@@ -148,7 +158,12 @@ mod tests {
         let app = create_app(cache, metrics, "1.2.3".to_string());
         let response = app
             .clone()
-            .oneshot(Request::builder().uri("/healthz").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/healthz")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -163,14 +178,19 @@ mod tests {
         let app = create_app(cache, metrics, "vX.Y".to_string());
         let response = app
             .clone()
-            .oneshot(Request::builder().uri("/version").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/version")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
         let body = to_bytes(response.into_body()).await.unwrap();
         assert_eq!(&body[..], b"vX.Y");
     }
-    
+
     #[tokio::test]
     async fn test_available_unused() {
         let mut map = HashMap::new();
@@ -180,7 +200,12 @@ mod tests {
         let app = create_app(cache, metrics, "1.0".to_string());
         let response = app
             .clone()
-            .oneshot(Request::builder().uri("/available?code=bar").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/available?code=bar")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);
@@ -197,7 +222,12 @@ mod tests {
         let app = create_app(cache, metrics, "1.0".to_string());
         let response = app
             .clone()
-            .oneshot(Request::builder().uri("/available?code=foo").body(Body::empty()).unwrap())
+            .oneshot(
+                Request::builder()
+                    .uri("/available?code=foo")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::OK);

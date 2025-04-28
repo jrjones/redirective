@@ -2,15 +2,15 @@
 //!
 //! See `.codex/prd.md` and `.codex/architecture.md` for design docs.
 
-mod config;
 mod cache;
+mod config;
 mod errors;
 mod git_sync;
 mod http;
 mod metrics;
 
-use crate::config::Config;
 use crate::cache::RouterCache;
+use crate::config::Config;
 use crate::errors::Error;
 
 /// Application entry point.

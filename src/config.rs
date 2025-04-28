@@ -1,9 +1,9 @@
 //! config module: loads links from YAML and service settings.
 
 use crate::errors::Error;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
-use serde::Deserialize;
 
 /// Service configuration parameters.
 pub struct ServiceConfig {
@@ -42,7 +42,12 @@ impl Config {
             // Strip inline comments after '|'
             let url = rest.splitn(2, '|').next().unwrap().trim().to_string();
             if url.is_empty() {
-                return Err(format!("Empty URL for key '{}' in links.yaml at line {}", key, idx + 1).into());
+                return Err(format!(
+                    "Empty URL for key '{}' in links.yaml at line {}",
+                    key,
+                    idx + 1
+                )
+                .into());
             }
             links.insert(key, url);
         }
