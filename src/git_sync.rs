@@ -38,7 +38,7 @@ pub fn start_git_sync(
                 .unwrap_or_else(|| std::path::Path::new("."));
             match Command::new("git")
                 .current_dir(repo_dir)
-                .args(&["pull", "--ff-only"])
+                .args(["pull", "--ff-only"])
                 .status()
             {
                 Ok(status) if status.success() => {
@@ -120,7 +120,7 @@ mod tests {
         let origin = tmp.join("origin.git");
         // Initialize bare origin
         Command::new("git")
-            .args(&["init", "--bare", origin.to_str().unwrap()])
+            .args(["init", "--bare", origin.to_str().unwrap()])
             .status()
             .expect("failed to init bare origin");
         // Determine default branch of bare repo (e.g., main or master)
@@ -130,7 +130,7 @@ mod tests {
         // Initialize init_dir non-bare and push initial commit
         let init_dir = tmp.join("init");
         Command::new("git")
-            .args(&["init", init_dir.to_str().unwrap()])
+            .args(["init", init_dir.to_str().unwrap()])
             .status()
             .expect("failed to init init_dir");
         // write initial files
@@ -141,30 +141,30 @@ mod tests {
         // git add, commit, and push
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["add", "links.yaml", "redirective.toml"])
+            .args(["add", "links.yaml", "redirective.toml"])
             .status()
             .unwrap();
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["commit", "-m", "init"])
+            .args(["commit", "-m", "init"])
             .status()
             .unwrap();
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["remote", "add", "origin", origin.to_str().unwrap()])
+            .args(["remote", "add", "origin", origin.to_str().unwrap()])
             .status()
             .unwrap();
         // Push initial commit to remote master
         // Push initial commit to remote default branch
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["push", "origin", &format!("HEAD:{}", default_branch)])
+            .args(["push", "origin", &format!("HEAD:{}", default_branch)])
             .status()
             .unwrap();
         // Clone to repo_dir
         let repo_dir = tmp.join("repo");
         Command::new("git")
-            .args(&[
+            .args([
                 "clone",
                 origin.to_str().unwrap(),
                 repo_dir.to_str().unwrap(),
@@ -190,28 +190,27 @@ mod tests {
         fs::write(&links_init, "bar: http://updated").unwrap();
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["add", "links.yaml"])
+            .args(["add", "links.yaml"])
             .status()
             .unwrap();
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["commit", "-m", "update"])
+            .args(["commit", "-m", "update"])
             .status()
             .unwrap();
         // Push update commit to remote master
         // Push update commit to remote default branch
         Command::new("git")
             .current_dir(&init_dir)
-            .args(&["push", "origin", &format!("HEAD:{}", default_branch)])
+            .args(["push", "origin", &format!("HEAD:{}", default_branch)])
             .status()
             .unwrap();
         // Wait for sync
         sleep(Duration::from_secs(2)).await;
         // Now cache should reflect new mapping
         assert_eq!(cache.lookup("bar"), Some("http://updated".to_string()));
-        assert_eq!(
+        assert!(
             metrics.reload_success.get() >= 1,
-            true,
             "Expected reload_success >=1"
         );
     }
