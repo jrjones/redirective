@@ -1,5 +1,5 @@
 # Stage 1: build
-FROM rust:1.74-slim AS builder
+FROM rust:stable-slim AS builder
 WORKDIR /usr/src/app
 # Install dependencies for building
 RUN apt-get update && apt-get install -y pkg-config libssl-dev git ca-certificates && rm -rf /var/lib/apt/lists/*
