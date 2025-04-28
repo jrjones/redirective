@@ -40,7 +40,7 @@ impl Config {
             let key = parts[0].trim().to_string();
             let rest = parts[1].trim();
             // Strip inline comments after '|'
-            let url = rest.splitn(2, '|').next().unwrap().trim().to_string();
+            let url = rest.split('|').next().unwrap().trim().to_string();
             if url.is_empty() {
                 return Err(format!(
                     "Empty URL for key '{}' in links.yaml at line {}",

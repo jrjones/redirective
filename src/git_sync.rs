@@ -126,7 +126,7 @@ mod tests {
         // Determine default branch of bare repo (e.g., main or master)
         let head_file = origin.join("HEAD");
         let head_ref = fs::read_to_string(&head_file).unwrap();
-        let default_branch = head_ref.trim().split('/').last().unwrap().to_string();
+        let default_branch = head_ref.trim().split('/').next_back().unwrap().to_string();
         // Initialize init_dir non-bare and push initial commit
         let init_dir = tmp.join("init");
         Command::new("git")
