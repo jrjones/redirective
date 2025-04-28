@@ -133,6 +133,17 @@ mod tests {
             .args(["init", init_dir.to_str().unwrap()])
             .status()
             .expect("failed to init init_dir");
+        // Configure user identity for CI commits
+        Command::new("git")
+            .current_dir(&init_dir)
+            .args(["config", "user.email", "ci@example.com"])
+            .status()
+            .unwrap();
+        Command::new("git")
+            .current_dir(&init_dir)
+            .args(["config", "user.name", "ci"])
+            .status()
+            .unwrap();
         // write initial files
         let links_init = init_dir.join("links.yaml");
         fs::write(&links_init, "foo: http://initial").unwrap();
