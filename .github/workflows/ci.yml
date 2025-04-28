@@ -33,6 +33,8 @@ jobs:
         run: cargo test -- --nocapture
       - name: audit dependencies
         uses: actions-rs/audit-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - name: build release
         run: cargo build --release
       - name: build Docker image
