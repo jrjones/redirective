@@ -16,8 +16,8 @@
       height: 100%;
       background: var(--bg);
       color: var(--fg);
-      font-family: "Fira Code", "Courier New", monospace;
-      font-size: 16px;
+      font-family: "Fira Code", "Menlo", "Consolas", monospace;
+      font-size: 20px;
       line-height: 1.4;
       overflow: hidden;
     }
@@ -58,17 +58,17 @@
   <script>
     (() => {
       const term = document.getElementById("terminal");
-      const charDelay = 18;
+      const charDelay = 150;
 
       const COMMANDS = {
         help: () => printLines([
           "Available commands:",
-          "  what    - info about this service",
-          "  about   – info about JRJ",
-          "  contact - attempting to contact JRJ",
-          "  clear   – clear the screen",
-          "  help    – show this list",
-          "  open <url>/<shortcode> – open url in new tab"
+          "  what             – info about this service",
+          "  about            – about JRJ",
+          "  contact          – how to reach JRJ",
+          "  clear            – clear the screen",
+          "  help             – show this list",
+          "  open <shortcode> – open url in new tab"
         ]),
         what: () => printLines([
           "JRJ's personal link shortener",
@@ -84,16 +84,24 @@
           "https://jrj.org"
         ].map(linkify)),
         contact: () => printLines([
-          "this is kind of one of those “if you know, you know” situations.",
+          "This is kind of one of those \"if you know, you know\" situations.",
           "If I wanted you to contact me you would know how to contact me.",
           "",
           "That said, JRJ...",
           " - Is on twitter/X as @jrj (but doesn’t really post anymore)",
           " - Used to blog at https://blog.jrj.org (but the site is archived)",
-          " - Is on LinkedIn -> https://jrj.io/in (but doesn’t accept unknown connections"
+          " - Is on LinkedIn -> https://jrj.io/in (but doesn’t accept unknown connections)"
         ].map(linkify)),
         clear: () => { term.innerHTML = ""; newPrompt(); },
-        open: (args) => { if(args[0]) window.open(args[0], "_blank"); else printLines(["Usage: open <url>"]); }
+        open: (args) => {
+          if(args[0]) {
+            window.open(args[0], "_blank");
+            print("Opening " + args[0]);
+          } else {
+            printLines(["Usage: open <url>"]); 
+          }
+          newPrompt();
+        }
       };
 
       let inputSpan = null;
@@ -130,8 +138,12 @@
         const parts = cmdLine.trim().split(/\s+/);
         const cmd = parts[0].toLowerCase();
         const args = parts.slice(1);
-        if(COMMANDS[cmd]) COMMANDS[cmd](args);
-        else if(cmd) print("Command not found: " + cmd);
+        if(COMMANDS[cmd]) {
+          COMMANDS[cmd](args);
+        } else if(cmd) {
+          print("Command not found: " + cmd);
+          newPrompt();
+        }
       }
 
       function newPrompt() {
@@ -166,7 +178,12 @@
         print("jrj.io redirective shell v1.0");
         print("Type 'help' for a list of commands.");
         newPrompt();
-        setTimeout(() => typeChars("about", () => {}), 300);
+        typeChars("help", () => {
+          cursorSpan.remove();
+          inputSpan = null;
+          cursorSpan = null;
+          runCommand("what");
+        });
       }
 
       term.addEventListener("click", () => term.focus());
