@@ -40,7 +40,10 @@ impl Config {
             let key = parts[0].trim().to_string();
             let rest = parts[1].trim();
             // Strip inline comments after '|'
-            let url = rest.split('|').next().unwrap().trim().to_string();
+            // Take part before inline comment and trim
+            let mut url = rest.split('|').next().unwrap().trim().to_string();
+            // Strip surrounding single or double quotes, if present
+            url = url.trim_matches(|c| c == '"' || c == '\'' ).to_string();
             if url.is_empty() {
                 return Err(format!(
                     "Empty URL for key '{}' in links.yaml at line {}",

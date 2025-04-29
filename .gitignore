@@ -27,7 +27,6 @@ Thumbs.db
 
 # Cargo specific
 /.cargo/
-/Cargo.lock
 
 # Node.js projects (if any scripting)
 /node_modules/
