@@ -7,27 +7,33 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
   color: var(--fg);
   font-family: "Fira Code", "Menlo", "Consolas", monospace;
   font-size: calc(100vw / 60); /* Dynamically adjust font size */
   line-height: 1.4;
   overflow: hidden;
+  background: #090909;
+}
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Ensure it doesn't block interactions */
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3),
+    rgba(0, 0, 0, 0.5) 1pt,
+    transparent 1pt,
+    transparent 1.5pt
+  );
+  z-index: 10; /* Ensure it is in front of content */
 }
 #terminal {
   position: relative;
-  width: 100%;
-  height: 100%;
-  padding: 20px;
-  overflow-y: auto;
-  white-space: pre-wrap;
-}
-#terminal::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.05) 2px 3px);
+  z-index: 0; /* Ensure the background is behind the content */
 }
 #terminal.flicker {
   animation: flicker 0.15s steps(1) infinite;
