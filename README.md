@@ -48,7 +48,9 @@ This creates a YAML file where each key is the YOURLS keyword and the value is t
  ### Docker
  Build and run via Docker:
  ```bash
- docker build -t redirective:latest .
+ # Build image with private links repository (requires LINKS_REPO_TOKEN env)
+ docker build --build-arg LINKS_REPO_TOKEN=$LINKS_REPO_TOKEN -t redirective:latest .
+ # Run the service
  docker run -p 8080:8080 redirective:latest
  ```
  ## CI
