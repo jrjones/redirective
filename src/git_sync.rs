@@ -44,7 +44,12 @@ pub fn start_git_sync(
                 std::path::PathBuf::from(".")
             });
             // Debug info
-            tracing::info!("git_sync debug"; repo_dir = %repo_dir.display(), cwd = %cwd.display(), git = %git_binary);
+            tracing::info!(
+                repo_dir = %repo_dir.display(),
+                cwd = %cwd.display(),
+                git = %git_binary,
+                "git_sync debug"
+            );
             // Check existence
             if !repo_dir.exists() {
                 error!("git_sync: repo_dir does not exist: {}", repo_dir.display());
