@@ -32,10 +32,14 @@ pub fn start_git_sync(
     task::spawn(async move {
         loop {
             time::sleep(Duration::from_secs(reload_interval_secs)).await;
-            // Determine repo directory
-            let repo_dir = std::path::Path::new(&links_path)
-                .parent()
-                .unwrap_or_else(|| std::path::Path::new("."));
+            // Use current working directory as repo directory
+            let repo_dir: std::path::PathBuf = match std::env::current_dir() {
+                Ok(dir) => dir,
+                Err(e) => {
+                    error!("git_sync: failed to get current_dir: {}", e);
+                    std::path::PathBuf::from(".")
+                }
+            };
             // Absolute git binary path
             let git_binary = "/usr/bin/git";
             // Current working directory
@@ -43,8 +47,8 @@ pub fn start_git_sync(
                 error!("git_sync: failed to get cwd: {}", e);
                 std::path::PathBuf::from(".")
             });
-            // Debug info
-            tracing::info!(
+            // Debug info: repo and git paths
+            error!(
                 repo_dir = %repo_dir.display(),
                 cwd = %cwd.display(),
                 git = %git_binary,

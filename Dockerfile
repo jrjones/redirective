@@ -9,15 +9,13 @@ COPY links.yaml redirective.toml ./
 RUN cargo build --release
 # Stage 2: runtime (with git for git-sync)
 FROM debian:bookworm-slim
-ARG LINKS_REPO_TOKEN
 RUN apt-get update \
     && apt-get install -y --no-install-recommends git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-# Clone links repository (requires build-arg LINKS_REPO_TOKEN)
-RUN git clone https://${LINKS_REPO_TOKEN}@github.com/jrjones/redirective-links.git .
-# Copy service config and compiled binary
-COPY --from=builder /usr/src/app/redirective.toml ./redirective.toml
+# Copy binary and config files
 COPY --from=builder /usr/src/app/target/release/redirective /usr/local/bin/redirective
+COPY --from=builder /usr/src/app/links.yaml ./
+COPY --from=builder /usr/src/app/redirective.toml ./
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/redirective"]

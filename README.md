@@ -47,12 +47,13 @@ This creates a YAML file where each key is the YOURLS keyword and the value is t
  ```
  ### Docker
  Build and run via Docker:
- ```bash
- # Build image with private links repository (requires LINKS_REPO_TOKEN env)
- docker build --build-arg LINKS_REPO_TOKEN=$LINKS_REPO_TOKEN -t redirective:latest .
- # Run the service
- docker run -p 8080:8080 redirective:latest
- ```
+```bash
+docker build -t redirective:latest .
+docker run -p 8080:8080 redirective:latest
+```  
+// Or, to hot-reload against a local clone:
+// git clone https://github.com/jrjones/redirective-links.git ./redirective-links
+// docker run -v $PWD/redirective-links:/app -w /app -p 8080:8080 redirective:latest
  ## CI
  This project uses GitHub Actions for CI. See `.github/workflows/ci.yml`.
  ## Documentation
