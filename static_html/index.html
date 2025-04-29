@@ -58,7 +58,7 @@
   <script>
     (() => {
       const term = document.getElementById("terminal");
-      const charDelay = 150;
+      const charDelay = 200;
 
       const COMMANDS = {
         help: () => printLines([
@@ -68,7 +68,7 @@
           "  contact          – how to reach JRJ",
           "  clear            – clear the screen",
           "  help             – show this list",
-          "  open <shortcode> – open url in new tab"
+          "  open [shortcode] – open url in new tab"
         ]),
         what: () => printLines([
           "JRJ's personal link shortener",
@@ -182,7 +182,7 @@
           cursorSpan.remove();
           inputSpan = null;
           cursorSpan = null;
-          runCommand("what");
+          runCommand("help");
         });
       }
 
