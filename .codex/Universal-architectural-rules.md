@@ -1,4 +1,7 @@
 # Universal Guidelines
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
+
 No matter the language, there are rules that you should always follow:
 
 ## 1 Know the Problem First

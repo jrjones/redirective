@@ -1,4 +1,7 @@
 # Swifth Idiomatic Rules
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
+
 Please follow the following guidelines when generating code in Swift.
 
 ## 1 -- Create modern targets

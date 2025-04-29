@@ -1,4 +1,6 @@
 ### C++ idiomatic rules (C++23-ish)
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
 
 1. **Build for C++23** -- Set the target (cxx_std_23 in CMake) and turn on warnings & sanitizers. Embrace new features: modules, std::expected, std::print, formatting ranges, and UTF-8 as the default source encoding.
 

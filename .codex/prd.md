@@ -1,4 +1,6 @@
 # High‑Level Architecture -- "Redirective" (Rust URL Redirector)
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
 
 ## 1. Overview
 

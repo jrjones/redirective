@@ -1,4 +1,7 @@
 ### **Executive cheat-sheet: 18 guardrails CodexCLI should obey for idiomatic Rust**
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
+
 _(all rules are distilled from The Rust Programming Language book; follow them in order)___
 
 1. **Project scaffolding & tooling** -- Always start with cargo new/cargo init; keep code in src/, docs in README, examples in examples/; run cargo fmt, cargo clippy --deny warnings, and cargo test before you surface code.

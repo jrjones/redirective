@@ -1,4 +1,6 @@
 # C idiomatic rules
+(C) Copyright 2025, [Joseph R. Jones](https://jrj.org)
+Licensed under MIT License
 
 1. **Target the modern dialect** -- Compile with -std=c23 (or at least c17) and enable the full warning set -Wall -Wextra -Wpedantic plus UBSan/ASan for debug builds. New C23 niceties (binary literals, digit separators, _BitInt, decimal floats, [[nodiscard]], [[deprecated]], empty initializer ={}) are all fair-game.
 
