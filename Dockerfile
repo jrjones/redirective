@@ -7,8 +7,11 @@ COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY links.yaml redirective.toml ./
 RUN cargo build --release
-# Stage 2: runtime
-FROM gcr.io/distroless/cc
+# Stage 2: runtime (with git for git-sync)
+FROM debian:bookworm-slim
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Copy binary and config files
 COPY --from=builder /usr/src/app/target/release/redirective /usr/local/bin/redirective
