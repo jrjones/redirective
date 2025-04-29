@@ -43,7 +43,7 @@ impl Config {
             // Take part before inline comment and trim
             let mut url = rest.split('|').next().unwrap().trim().to_string();
             // Strip surrounding single or double quotes, if present
-            url = url.trim_matches(|c| c == '"' || c == '\'' ).to_string();
+            url = url.trim_matches(|c| c == '"' || c == '\'').to_string();
             if url.is_empty() {
                 return Err(format!(
                     "Empty URL for key '{}' in links.yaml at line {}",

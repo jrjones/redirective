@@ -11,14 +11,14 @@ use crate::metrics::Metrics;
 use axum::{
     Router,
     extract::{Extension, Query},
-    http::{header, Uri},
+    http::{Uri, header},
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
-use prometheus::{Encoder, TextEncoder};
-use std::path::Path as FsPath;
 use mime_guess::from_path;
+use prometheus::{Encoder, TextEncoder};
 use serde::Deserialize;
+use std::path::Path as FsPath;
 use std::{net::SocketAddr, time::Instant};
 use tokio::fs;
 
@@ -32,7 +32,11 @@ struct AppState {
 
 /// Build the Axum application with routes and shared state.
 fn create_app(cache: RouterCache, metrics: Metrics, version: String) -> Router<()> {
-    let state = AppState { cache, metrics, version };
+    let state = AppState {
+        cache,
+        metrics,
+        version,
+    };
     Router::new()
         .route("/healthz", get(healthz_handler))
         .route("/version", get(version_handler))
@@ -87,22 +91,31 @@ async fn available_handler(
 // redirect_handler removed; use spa_handler fallback for redirects and static files
 
 /// SPA/static fallback: tries shortcode redirect, then static files, else serves index.html
-async fn spa_handler(
-    Extension(state): Extension<AppState>,
-    uri: Uri,
-) -> Response {
+async fn spa_handler(Extension(state): Extension<AppState>, uri: Uri) -> Response {
     let start = Instant::now();
     let raw_path = uri.path();
     let trimmed = raw_path.trim_start_matches('/');
     // shortcode redirect
     if let Some(url) = state.cache.lookup(trimmed) {
-        state.metrics.redirect_total.with_label_values(&[trimmed]).inc();
+        state
+            .metrics
+            .redirect_total
+            .with_label_values(&[trimmed])
+            .inc();
         let elapsed = start.elapsed().as_secs_f64();
-        state.metrics.redirect_latency.with_label_values(&[trimmed]).observe(elapsed);
+        state
+            .metrics
+            .redirect_latency
+            .with_label_values(&[trimmed])
+            .observe(elapsed);
         return Redirect::temporary(&url).into_response();
     }
     // static file or directory
-    let file_rel = if trimmed.is_empty() { "index.html" } else { trimmed };
+    let file_rel = if trimmed.is_empty() {
+        "index.html"
+    } else {
+        trimmed
+    };
     let fs_path = FsPath::new("static_html").join(file_rel);
     if let Ok(meta) = fs::metadata(&fs_path).await {
         if meta.is_file() {
@@ -113,13 +126,21 @@ async fn spa_handler(
         } else if meta.is_dir() {
             let idx = fs_path.join("index.html");
             if let Ok(contents) = fs::read(&idx).await {
-                return ([(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())], contents).into_response();
+                return (
+                    [(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())],
+                    contents,
+                )
+                    .into_response();
             }
         }
     }
     // fallback to root index.html
     let default = fs::read("static_html/index.html").await.unwrap_or_default();
-    ([(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())], default).into_response()
+    (
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())],
+        default,
+    )
+        .into_response()
 }
 
 /// Run the HTTP server.
@@ -140,10 +161,10 @@ pub async fn run_http_server(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::StatusCode;
     use crate::metrics::init_metrics;
     use axum::body::Body;
     use axum::http::Request;
+    use axum::http::StatusCode;
     use hyper::body::to_bytes;
     use std::collections::HashMap;
     use tower::ServiceExt;
