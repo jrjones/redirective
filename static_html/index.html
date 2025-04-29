@@ -57,7 +57,7 @@
       0%, 49% { opacity: 1; }
       50%, 100% { opacity: 0; }
     }
-    .clickable { text-decoration: underline; cursor: pointer; }
+    .clickable { text-decoration: underline; cursor: pointer; color: aqua; }
     a { color: inherit; text-decoration: underline; }
     .yellowbold { color: #ffcc00; font-weight: bold;}
   </style>
@@ -72,13 +72,13 @@
       const COMMANDS = {
         help: () => printLines([
           "Available commands:",
-          "  what             – info about this service",
-          "  about            – about JRJ",
-          "  contact          – how to reach JRJ",
-          "  wally            - who's a good boy?",
-          "  clear            – clear the screen",
-          "  help             – show this list",
-          "  open [shortcode] – open url in new tab",
+          "  <span class='clickable' data-command='what'>what</span>             – info about this service",
+          "  <span class='clickable' data-command='about'>about</span>            – about JRJ",
+          "  <span class='clickable' data-command='contact'>contact</span>          – how to reach JRJ",
+          "  <span class='clickable' data-command='wally'>wally</span>            - who's a good boy?",
+          "  <span class='clickable' data-command='clear'>clear</span>            – clear the screen",
+          "  <span class='clickable' data-command='help'>help</span>             – show this list",
+          "  <span class='clickable' data-command='open [shortcode]'>open [shortcode]</span> – open url in new tab",
           " ",
         ]),
         what: () => printLines([
@@ -228,6 +228,10 @@
         // Add static introductory lines with normal spacing
         term.innerHTML = `jrj.io redirective shell v1.0<br>Type 'help' for a list of commands.`;
         newPrompt();
+        // Add a 200ms delay before typing 'help' and pressing Enter
+        setTimeout(() => {
+          typeChars("help", () => handleKey({ key: "Enter", preventDefault: () => {} }));
+        }, 500);
       }
 
       term.addEventListener("click", () => term.focus());
@@ -237,13 +241,8 @@
       document.addEventListener("click", (e) => {
         const el = e.target.closest(".clickable");
         if (el) {
-          const command = el.dataset.command || el.textContent;
-          if (command === "rusty") {
-            inputSpan.textContent = "rusty"; 
-            handleKey({ key: "Enter", preventDefault: () => {} }); // Simulate pressing Enter
-          } else {
-            runCommand(command);
-          }
+          const command = el.dataset.command || el.textContent.trim();
+          typeChars(command, () => handleKey({ key: "Enter", preventDefault: () => {} })); // Type the command and press Enter
         }
       });
 
