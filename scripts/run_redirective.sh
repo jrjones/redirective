@@ -30,6 +30,7 @@ docker build -t redirective:latest .
 echo "Starting redirective container..."
 docker run --rm \
   -v "$PWD/redirective-links:/app" \
+  -v "$PWD/static_html:/app/static_html" \
   -w /app \
   -p 8080:8080 \
   redirective:latest

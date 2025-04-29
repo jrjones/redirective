@@ -3,8 +3,13 @@ Redirective is a stateless Rust micro-service that maps short codes to full URLs
  - `GET /{code}`: 302 redirect to the target URL if found, otherwise 404.
  - `GET /healthz`: health check endpoint.
  - `GET /version`: service version endpoint.
+ - `GET /available?code=foobar`: Returns true or false based on whether or not the code passed in the query string is available
 
-Features:
+If none of the above match, it will look for a matching file or directory in the `static_html` folder, allowing you to host a static site.
+
+404s will redirect to /index.html for now (plan to add a 404.html in a future release.)
+
+## Features:
  - Thread-safe, lock-free reads with `ArcSwap`.
  - Hot-reload of mappings on file changes via Git sync daemon.
  - Prometheus metrics and structured JSON logging.
