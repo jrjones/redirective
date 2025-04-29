@@ -10,13 +10,14 @@ use crate::metrics::Metrics;
 /// Serves `/healthz`, `/version`, `/metrics`, and `/:code` endpoints.
 use axum::{
     Router,
-    body::Body,
-    extract::{Extension, Path, Query},
-    http::{StatusCode, header},
+    extract::{Extension, Query},
+    http::{header, Uri},
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
 use prometheus::{Encoder, TextEncoder};
+use std::path::Path as FsPath;
+use mime_guess::from_path;
 use serde::Deserialize;
 use std::{net::SocketAddr, time::Instant};
 use tokio::fs;
@@ -31,19 +32,14 @@ struct AppState {
 
 /// Build the Axum application with routes and shared state.
 fn create_app(cache: RouterCache, metrics: Metrics, version: String) -> Router<()> {
-    let state = AppState {
-        cache,
-        metrics,
-        version,
-    };
+    let state = AppState { cache, metrics, version };
     Router::new()
         .route("/healthz", get(healthz_handler))
         .route("/version", get(version_handler))
         .route("/available", get(available_handler))
         .route("/metrics", get(metrics_handler))
-        .route("/", get(root_handler))
-        .route("/static", get(root_handler))
-        .route("/:code", get(redirect_handler))
+        // Fallback to handle redirects, static files, or SPA index.html
+        .fallback(spa_handler)
         .layer(Extension(state))
 }
 
@@ -68,21 +64,7 @@ async fn metrics_handler(Extension(state): Extension<AppState>) -> impl IntoResp
     ([(header::CONTENT_TYPE, content_type)], buffer)
 }
 
-/// Serve the root index.html from ./static_html
-async fn root_handler() -> impl IntoResponse {
-    let path = "static_html/index.html";
-    match fs::read_to_string(path).await {
-        Ok(html) => Response::builder()
-            .status(StatusCode::OK)
-            .header(header::CONTENT_TYPE, "text/html; charset=utf-8")
-            .body(Body::from(html))
-            .unwrap(),
-        Err(_) => Response::builder()
-            .status(StatusCode::NOT_FOUND)
-            .body(Body::empty())
-            .unwrap(),
-    }
-}
+// root_handler removed; spa_handler fallback handles static files and index.html
 
 /// Available endpoint: tells whether a shortcode is unused.
 #[derive(Deserialize)]
@@ -102,28 +84,42 @@ async fn available_handler(
     }
 }
 
-/// Redirect endpoint.
-async fn redirect_handler(
+// redirect_handler removed; use spa_handler fallback for redirects and static files
+
+/// SPA/static fallback: tries shortcode redirect, then static files, else serves index.html
+async fn spa_handler(
     Extension(state): Extension<AppState>,
-    Path(code): Path<String>,
-) -> impl IntoResponse {
+    uri: Uri,
+) -> Response {
     let start = Instant::now();
-    if let Some(url) = state.cache.lookup(&code) {
-        state
-            .metrics
-            .redirect_total
-            .with_label_values(&[&code])
-            .inc();
+    let raw_path = uri.path();
+    let trimmed = raw_path.trim_start_matches('/');
+    // shortcode redirect
+    if let Some(url) = state.cache.lookup(trimmed) {
+        state.metrics.redirect_total.with_label_values(&[trimmed]).inc();
         let elapsed = start.elapsed().as_secs_f64();
-        state
-            .metrics
-            .redirect_latency
-            .with_label_values(&[&code])
-            .observe(elapsed);
-        Redirect::temporary(&url).into_response()
-    } else {
-        StatusCode::NOT_FOUND.into_response()
+        state.metrics.redirect_latency.with_label_values(&[trimmed]).observe(elapsed);
+        return Redirect::temporary(&url).into_response();
     }
+    // static file or directory
+    let file_rel = if trimmed.is_empty() { "index.html" } else { trimmed };
+    let fs_path = FsPath::new("static_html").join(file_rel);
+    if let Ok(meta) = fs::metadata(&fs_path).await {
+        if meta.is_file() {
+            if let Ok(contents) = fs::read(&fs_path).await {
+                let mime = from_path(&fs_path).first_or_octet_stream();
+                return ([(header::CONTENT_TYPE, mime.to_string())], contents).into_response();
+            }
+        } else if meta.is_dir() {
+            let idx = fs_path.join("index.html");
+            if let Ok(contents) = fs::read(&idx).await {
+                return ([(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())], contents).into_response();
+            }
+        }
+    }
+    // fallback to root index.html
+    let default = fs::read("static_html/index.html").await.unwrap_or_default();
+    ([(header::CONTENT_TYPE, "text/html; charset=utf-8".to_string())], default).into_response()
 }
 
 /// Run the HTTP server.
@@ -144,6 +140,7 @@ pub async fn run_http_server(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::StatusCode;
     use crate::metrics::init_metrics;
     use axum::body::Body;
     use axum::http::Request;

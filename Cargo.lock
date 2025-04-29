@@ -525,6 +525,7 @@ dependencies = [
  "arc-swap",
  "axum",
  "hyper",
+ "mime_guess",
  "prometheus",
  "serde",
  "serde_yaml",

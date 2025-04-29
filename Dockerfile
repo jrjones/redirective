@@ -17,5 +17,7 @@ WORKDIR /app
 COPY --from=builder /usr/src/app/target/release/redirective /usr/local/bin/redirective
 COPY --from=builder /usr/src/app/links.yaml ./
 COPY --from=builder /usr/src/app/redirective.toml ./
+# Copy static files into the container
+COPY static_html ./static_html
 EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/redirective"]
