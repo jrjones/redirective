@@ -1,0 +1,57 @@
+:root {
+  --bg: #000000;
+  --fg: #33ff33;
+  --char-width: 8px; /* Approximate width of a monospace character */
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: "Fira Code", "Menlo", "Consolas", monospace;
+  font-size: calc(100vw / 60); /* Dynamically adjust font size */
+  line-height: 1.4;
+  overflow: hidden;
+}
+#terminal {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 20px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+#terminal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.05) 2px 3px);
+}
+#terminal.flicker {
+  animation: flicker 0.15s steps(1) infinite;
+}
+@keyframes flicker {
+  0%, 100% { opacity: 0.93; }
+  60% { opacity: 1; }
+}
+.cursor {
+  display: inline-block;
+  width: 0.6em; /* Match the width of a single character */
+  height: 1em; /* Match the height of a single line */
+  background: var(--fg);
+  vertical-align: bottom; /* Align with text baseline */
+  transform: translateY(-20%); /* Nudge cursor slightly upward */
+  animation: blink 1s steps(2, start) infinite;
+}
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
+}
+.clickable { text-decoration: underline; cursor: pointer; color: aqua; }
+a { color: inherit; text-decoration: underline; }
+.yellowbold { color: #ffcc00; font-weight: bold;}
+img {
+  filter: hue-rotate(90deg) saturate(50%); /* Muted green tint */
+}
