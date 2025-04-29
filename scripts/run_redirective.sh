@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# Parse options: allow -t to set LINKS_REPO_TOKEN
+while getopts "t:" opt; do
+  case "$opt" in
+    t) export LINKS_REPO_TOKEN="$OPTARG" ;;
+    *) echo "Usage: $0 [-t token]" >&2; exit 1 ;;
+  esac
+done
+shift $((OPTIND -1))
 
 echo "Stopping running redirective containers (by image)..."
 # Stop any containers running the redirective image
@@ -15,8 +23,10 @@ if [ -n "$images" ]; then
   docker rmi -f $images
 fi
 
-echo "Sourcing 1passwordexport to set LINKS_REPO_TOKEN..."
-source ./scripts/1passExport.sh
+if [ -z "${LINKS_REPO_TOKEN:-}" ]; then
+  echo "Sourcing 1passwordexport to set LINKS_REPO_TOKEN..."
+  source ./scripts/1passExport.sh
+fi
 
 : "${LINKS_REPO_TOKEN:?Environment variable LINKS_REPO_TOKEN must be set}"
 
