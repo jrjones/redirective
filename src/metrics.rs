@@ -1,3 +1,4 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! metrics module: Prometheus metrics for redirective service.
 
 use prometheus::{HistogramVec, IntCounter, IntCounterVec, Registry};
