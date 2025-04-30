@@ -1,3 +1,5 @@
+// (C) Copyright 2025 Joseph R. Jones - https://jrj.org - MIT License
+
 (() => {
   const term = document.getElementById("terminal");
   const charDelay = 3;
@@ -73,10 +75,11 @@
       newPrompt();
     },
 
-    ls: (args) => printLines([
-      "ferris.png  index.html  jrjconsole.js  styles.css  wally.png",
-      " "
-    ]),
+    ls: (args) => {
+      const files = ["ascii.txt", "ferris.png", "index.html", "jrjconsole.js", "styles.css", "wally.png"];
+      const links = files.map(f => `<a href="${f}" target="_blank">${f}</a>`);
+      printLines([links.join("  "), " "]);  
+    },
     pwd: () => printLines([
       "/home/jrj",
       " "
