@@ -91,6 +91,7 @@
     const div = document.createElement("div");
     div.innerHTML = line; // Render HTML content properly
     term.appendChild(div);
+    scrollBottom(); // Ensure the viewport scrolls to the bottom
 
     let i = 0;
     (function type() {
@@ -111,6 +112,7 @@
         newPrompt();
       }
     })();
+    scrollBottom(); // Ensure the viewport scrolls to the bottom after all lines are printed
   }
 
   function runCommand(cmdLine) {

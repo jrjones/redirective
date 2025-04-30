@@ -3,7 +3,11 @@
   --fg: #33ff33;
   --char-width: 8px; /* Approximate width of a monospace character */
 }
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  outline: none; /* Remove focus outlines */
+  border: none; /* Remove any borders */
+}
 html, body {
   margin: 0;
   height: 100%;
@@ -11,29 +15,30 @@ html, body {
   font-family: "Fira Code", "Menlo", "Consolas", monospace;
   font-size: calc(100vw / 60); /* Dynamically adjust font size */
   line-height: 1.4;
-  overflow: hidden;
+  overflow: auto; /* Allow scrolling */
   background: #090909;
+  padding: 20px; /* Add padding for the content */
 }
 body::before {
   content: '';
-  position: fixed;
+  position: fixed; /* Ensure it stays in place */
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Ensure it doesn't block interactions */
+  pointer-events: none; /* Allow interactions with content */
   background: repeating-linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0.3),
-    rgba(0, 0, 0, 0.5) 1pt,
+    rgba(0, 0, 0, 0.4),
+    rgba(0, 0, 0, 0.4) 1pt,
     transparent 1pt,
-    transparent 1.5pt
+    transparent 2pt
   );
   z-index: 10; /* Ensure it is in front of content */
 }
 #terminal {
-  position: relative;
-  z-index: 0; /* Ensure the background is behind the content */
+  height: 100%; /* Ensure it occupies the full viewport height */
+  overflow-y: auto; /* Enable vertical scrolling */
 }
 #terminal.flicker {
   animation: flicker 0.15s steps(1) infinite;
