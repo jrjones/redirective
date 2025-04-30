@@ -1,3 +1,4 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! cache module: maintains thread-safe router cache.
 
 use arc_swap::ArcSwap;
