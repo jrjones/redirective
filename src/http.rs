@@ -1,3 +1,4 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! http module: HTTP server with Axum.
 
 use crate::cache::RouterCache;
