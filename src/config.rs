@@ -1,3 +1,4 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! config module: loads links from YAML and service settings.
 
 use crate::errors::Error;
