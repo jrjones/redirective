@@ -9,6 +9,8 @@ If none of the above match, it will look for a matching file or directory in the
 
 404s will redirect to /index.html for now (plan to add a 404.html in a future release.)
 
+Redirective is the codebase for [jrj.io](https://jrj.io).
+
 ## Codex
 This project was done in part because I was using [Yourls](https://github.com/YOURLS/YOURLS), and it's a little old and bloated. But mostly as a fun project to try out [OpenAI's Codex CLI](https://github.com/openai/codex) - to see how I'm getting the best results from it, check out the files in the .codex directory, which I reference frequently in my prompts. Fun stuff. :) I have probably written barely more than half of the code here. 
 
