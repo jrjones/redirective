@@ -1,6 +1,12 @@
 (() => {
   const term = document.getElementById("terminal");
   const charDelay = 3;
+  // Generate a random IPv4 address for fun hacker alerts
+  function randomIP() {
+    return Array(4).fill(0)
+      .map(() => Math.floor(Math.random() * 256))
+      .join('.');
+  }
 
   const COMMANDS = {
     help: () => printLines([
@@ -65,13 +71,88 @@
         printLines(["Usage: open <url>"]); 
       }
       newPrompt();
-    }
+    },
+
+    ls: (args) => printLines([
+      "ferris.png  index.html  jrjconsole.js  styles.css  wally.png",
+      " "
+    ]),
+    pwd: () => printLines([
+      "/home/jrj",
+      " "
+    ]),
+    cd: (args) => {
+      if (args[0]) {
+        printLines([`bash: cd: ${args[0]}: No such file or directory`]);
+      } else {
+        newPrompt();
+      }
+    },
+    echo: (args) => print(args.join(" "), newPrompt),
+    whoami: () => printLines([
+      "jrj",
+      " "
+    ]),
+    date: () => printLines([
+      new Date().toString(),
+      " "
+    ]),
+    uname: () => printLines([
+      "Linux",
+      " "
+    ]),
+    id: () => printLines([
+      "uid=1000(jrj) gid=1000(jrj) groups=1000(jrj)",
+      " "
+    ]),
+    mkdir: (args) => printLines([]),
+    rmdir: (args) => printLines([]),
+    rm: (args) => printLines([]),
+    touch: (args) => printLines([]),
+    // Hidden fun hacker-detection commands
+    su: () => {
+      printLinesThen([
+        "<span style='color:red'>Security Alert: Unauthorized access detected!</span>",
+        `<span style='color:red'>IP address: ${randomIP()}</span>`,
+        " "
+      ], () => {
+        setTimeout(() => {
+          fetch("ascii.txt")
+            .then(res => res.text())
+            .then(text => {
+              const lines = text.split(/\\r?\\n/);
+              printLines(lines);
+            });
+        }, 1000);
+      });
+    },
+    sudo: (args) => {
+      printLinesThen([
+        "<span style='color:red'>Security Alert: Unauthorized sudo access detected!</span>",
+        `<span style='color:red'>IP address: ${randomIP()}</span>`,
+        " "
+      ], () => {
+        setTimeout(() => {
+          fetch("ascii.txt")
+            .then(res => res.text())
+            .then(text => {
+              const lines = text.split(/\\r?\\n/);
+              printLines(lines);
+            });
+        }, 1000);
+      });
+    },
   };
 
   let inputSpan = null;
   let cursorSpan = null;
 
-  function scrollBottom() { term.scrollTop = term.scrollHeight; }
+  function scrollBottom() {
+    // Scroll to bottom after content updates (next frame) to ensure new lines are shown
+    requestAnimationFrame(() => {
+      term.scrollTop = term.scrollHeight;
+    });
+  }
 
   function typeChars(str, cb) {
     let i = 0;
@@ -89,17 +170,20 @@
 
   function print(line = "", cb) {
     const div = document.createElement("div");
-    div.innerHTML = line; // Render HTML content properly
     term.appendChild(div);
-    scrollBottom(); // Ensure the viewport scrolls to the bottom
+    scrollBottom(); // bring new line into view before typing
 
     let i = 0;
     (function type() {
       if (i < line.length) {
-        div.innerHTML = line.slice(0, i + 1); // Update content progressively
+        div.innerHTML = line.slice(0, i + 1); // update content progressively
+        scrollBottom(); // keep scrolling as characters are added
         i++;
         setTimeout(type, charDelay);
-      } else if (cb) cb();
+      } else {
+        scrollBottom(); // ensure fully typed line is visible
+        if (cb) cb();
+      }
     })();
   }
 
@@ -114,6 +198,18 @@
     })();
     scrollBottom(); // Ensure the viewport scrolls to the bottom after all lines are printed
   }
+  // Variant of printLines that invokes a callback instead of newPrompt at end
+  function printLinesThen(lines, cb) {
+    let i = 0;
+    (function printNext() {
+      if (i < lines.length) {
+        print(lines[i++], () => setTimeout(printNext, 100));
+      } else if (cb) {
+        cb();
+      }
+    })();
+    scrollBottom(); // Ensure the viewport scrolls to the bottom
+  }
 
   function runCommand(cmdLine) {
     const parts = cmdLine.trim().split(/\s+/);
@@ -122,7 +218,7 @@
     if(COMMANDS[cmd]) {
       COMMANDS[cmd](args);
     } else if(cmd) {
-      print("Command not found: " + cmd);
+      print("Command not found: " + cmd + ". You may not have permission");
       newPrompt();
     }
   }

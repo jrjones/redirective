@@ -39,6 +39,7 @@ body::before {
 #terminal {
   height: 100%; /* Ensure it occupies the full viewport height */
   overflow-y: auto; /* Enable vertical scrolling */
+  white-space: pre; /* Preserve whitespace and line breaks for ASCII art */
 }
 #terminal.flicker {
   animation: flicker 0.15s steps(1) infinite;
