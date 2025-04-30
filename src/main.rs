@@ -1,3 +1,4 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! Main entry point for the redirective service.
 //!
 //! See `.codex/prd.md` and `.codex/architecture.md` for design docs.
