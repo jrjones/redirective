@@ -1,4 +1,6 @@
+// (C) Copyright 2025, Joseph R. Jones - https://jrj.org - Licensed under MIT License
 //! git_sync module: periodically pulls from Git and reloads config.
+// (so you can do a git pull of just links - set up your own repo - jrjones/redirective-links is not public.
 
 // Git sync pulls to update RouterCache periodically
 
