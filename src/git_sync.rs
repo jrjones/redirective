@@ -73,6 +73,16 @@ pub fn start_git_sync(
                     // Reload configuration
                     match Config::load(&links_path) {
                         Ok(cfg) => {
+                            // Write updated shortcodes list for client-side autocomplete
+                            if let Ok(_) = std::env::current_dir() {
+                                // Collect and sort shortcode keys
+                                let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
+                                codes.sort();
+                                let content = codes.join("\n");
+                                if let Err(e) = std::fs::write("static_html/shortcodes.txt", &content) {
+                                    error!("failed to write static_html/shortcodes.txt: {}", e);
+                                }
+                            }
                             cache.swap(cfg.links);
                             metrics.reload_success.inc();
                         }

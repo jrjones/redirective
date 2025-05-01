@@ -69,3 +69,8 @@ a { color: inherit; text-decoration: underline; }
 img {
   filter: hue-rotate(90deg) saturate(50%); /* Muted green tint */
 }
+/* Ghost autocomplete text: semi-transparent to appear darker */
+.ghost {
+  /* Dark green for inline autocomplete */
+  color: rgba(0, 128, 0, 1) !important;
+}

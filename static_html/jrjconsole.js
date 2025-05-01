@@ -10,6 +10,17 @@
       .join('.');
   }
 
+  // Client-side list of shortcodes for autocomplete
+  let SHORTCODES = [];
+  // Load shortcodes file (one code per line)
+  fetch("shortcodes.txt")
+    .then(res => res.text())
+    .then(text => {
+      SHORTCODES = text.split(/\r?\n/).filter(line => line);
+    })
+    .catch(() => {
+      // ignore if not available
+    });
   const COMMANDS = {
     help: () => printLines([
       "Available commands:",
@@ -66,12 +77,24 @@
     ]),
     clear: () => { term.innerHTML = "jrj.io redirective shell v1.0<br>Type 'help' for a list of commands."; newPrompt(); },
     open: (args) => {
-      if(args[0]) {
-        window.open(args[0], "_blank");
-        print("Opening " + args[0]);
-      } else {
-        printLines(["Usage: open <url>"]); 
+      // If no argument, list available shortcodes
+      if (!args[0]) {
+        if (SHORTCODES.length > 0) {
+          printLines(SHORTCODES);
+        } else {
+          printLines(["(no shortcodes available)"]);
+        }
+        return;
       }
+      const code = args[0];
+      // If it's a known shortcode, open via redirect endpoint
+      if (SHORTCODES.includes(code)) {
+        window.open("/" + code, "_blank");
+      } else {
+        // fallback: treat as URL
+        window.open(code, "_blank");
+      }
+      print("Opening " + args[0]);
       newPrompt();
     },
 
@@ -149,6 +172,11 @@
 
   let inputSpan = null;
   let cursorSpan = null;
+  // Autocomplete state
+  let suggestionDiv = null;
+  let ghostSpan = null;
+  let currentSuggestions = [];
+  let selectedSuggestionIndex = 0;
 
   function scrollBottom() {
     // Scroll to bottom after content updates (next frame) to ensure new lines are shown
@@ -213,6 +241,77 @@
     })();
     scrollBottom(); // Ensure the viewport scrolls to the bottom
   }
+  // Autocomplete helpers
+  function clearSuggestions() {
+    currentSuggestions = [];
+    if (suggestionDiv) suggestionDiv.innerHTML = '';
+    if (ghostSpan) ghostSpan.textContent = '';
+  }
+
+  function updateSuggestionDisplay() {
+    if (!suggestionDiv || !ghostSpan) return;
+    // Clear previous suggestions
+    suggestionDiv.innerHTML = '';
+    const full = inputSpan.textContent;
+    const idx = full.indexOf(' ');
+    // Only autocomplete arguments after the command
+    if (idx <= 0 || currentSuggestions.length === 0) {
+      ghostSpan.textContent = '';
+      return;
+    }
+    // Position suggestions under the argument start
+    const promptLen = 2; // length of '$ '
+    suggestionDiv.style.marginLeft = `${promptLen + idx + 1}ch`;
+    // Compute argument prefix and selected suggestion
+    const argPrefix = full.slice(idx + 1);
+    const sel = currentSuggestions[selectedSuggestionIndex];
+    // Inline ghost for the remainder of the suggestion
+    if (sel.startsWith(argPrefix)) {
+      ghostSpan.textContent = sel.slice(argPrefix.length);
+    } else {
+      ghostSpan.textContent = '';
+    }
+    // Show list of up to 5 suggestions, highlighting the selected one
+    currentSuggestions.slice(0, 5).forEach((s, i) => {
+      const line = document.createElement('div');
+      line.textContent = s;
+      if (i === selectedSuggestionIndex) {
+        // Highlight selection
+        line.style.color = '#ffff00';
+      }
+      suggestionDiv.appendChild(line);
+    });
+  }
+
+  function applySuggestion(withSpace) {
+    if (currentSuggestions.length === 0) return;
+    const sel = currentSuggestions[selectedSuggestionIndex];
+    // Preserve command prefix (e.g., 'open') and replace argument only
+    const text = inputSpan.textContent;
+    const idx = text.indexOf(' ');
+    let newText;
+    if (idx > 0) {
+      const cmd = text.slice(0, idx);
+      newText = cmd + ' ' + sel + (withSpace ? ' ' : '');
+    } else {
+      newText = sel + (withSpace ? ' ' : '');
+    }
+    inputSpan.textContent = newText;
+    clearSuggestions();
+  }
+
+  function updateAutocomplete() {
+    const text = inputSpan.textContent;
+    const idx = text.indexOf(' ');
+    if (idx > 0 && text.slice(0, idx).toLowerCase() === 'open') {
+      const prefix = text.slice(idx + 1);
+      currentSuggestions = SHORTCODES.filter(c => c.startsWith(prefix));
+      selectedSuggestionIndex = 0;
+      updateSuggestionDisplay();
+    } else {
+      clearSuggestions();
+    }
+  }
 
   function runCommand(cmdLine) {
     const parts = cmdLine.trim().split(/\s+/);
@@ -226,36 +325,99 @@
     }
   }
 
+  // Create a new input prompt with autocomplete container
   function newPrompt() {
+    // Reset autocomplete state
+    currentSuggestions = [];
+    selectedSuggestionIndex = 0;
+    ghostSpan = null;
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `<span class="prompt">$ </span><span id="input"></span>`;
     inputSpan = wrapper.querySelector("#input");
+    // Create ghost inline suggestion span
+    ghostSpan = document.createElement("span");
+    ghostSpan.className = "ghost";
+    wrapper.appendChild(ghostSpan);
+    // Create cursor
     cursorSpan = document.createElement("span");
     cursorSpan.className = "cursor";
-    wrapper.appendChild(cursorSpan); // Append cursor after input
+    wrapper.appendChild(cursorSpan);
+    // Suggestion list container
+    suggestionDiv = document.createElement("div");
+    // margin-left will be set dynamically in updateSuggestionDisplay
+    suggestionDiv.style.whiteSpace = 'pre';
+    wrapper.appendChild(suggestionDiv);
     term.appendChild(wrapper);
     scrollBottom();
   }
 
   function handleKey(e) {
     if (!inputSpan) return;
-    e.preventDefault();
-    if (e.key === "Backspace") {
-      inputSpan.textContent = inputSpan.textContent.slice(0, -1);
-    } else if (e.key === "Enter") {
-      const cmdLine = inputSpan.textContent.trim();
-      if (cmdLine === "") {
-        newPrompt(); // Create a new prompt if no command is entered
-        return;
+    const key = e.key;
+    // Autocomplete interactions
+    if (key === 'Tab') {
+      e.preventDefault();
+      if (currentSuggestions.length > 0) {
+        // Accept suggestion without extra space
+        applySuggestion(false);
       }
-      cursorSpan.remove(); // Remove cursor after command
+      return;
+    }
+    // Navigate suggestions (Arrow keys)
+    if (currentSuggestions.length > 0 && (key === 'ArrowDown' || key === 'ArrowUp' || e.keyCode === 40 || e.keyCode === 38)) {
+      e.preventDefault();
+      if (key === 'ArrowDown' || e.keyCode === 40) {
+        selectedSuggestionIndex = (selectedSuggestionIndex + 1) % currentSuggestions.length;
+      } else {
+        selectedSuggestionIndex = (selectedSuggestionIndex - 1 + currentSuggestions.length) % currentSuggestions.length;
+      }
+      updateSuggestionDisplay();
+      return;
+    }
+    if (key === 'Enter') {
+      e.preventDefault();
+      // If suggestions exist, accept current selection first
+      if (currentSuggestions.length > 0) {
+        applySuggestion(false);
+      }
+      // Execute the command
+      const cmdLine = inputSpan.textContent.trim();
+      clearSuggestions();
+      cursorSpan.remove();
       inputSpan = null;
       cursorSpan = null;
-      runCommand(cmdLine);
-    } else if (e.key.length === 1) {
-      inputSpan.textContent += e.key;
+      if (cmdLine === "") {
+        newPrompt();
+      } else {
+        runCommand(cmdLine);
+      }
+      return;
     }
-    scrollBottom();
+    if (key === 'Backspace') {
+      e.preventDefault();
+      inputSpan.textContent = inputSpan.textContent.slice(0, -1);
+      updateAutocomplete();
+      return;
+    }
+    if (key === ' ') {
+      e.preventDefault();
+      if (currentSuggestions.length > 0) {
+        // Accept suggestion and add space
+        applySuggestion(true);
+      } else {
+        inputSpan.textContent += ' ';
+        updateAutocomplete();
+      }
+      return;
+    }
+    // Character input
+    if (key.length === 1) {
+      e.preventDefault();
+      inputSpan.textContent += key;
+      updateAutocomplete();
+      return;
+    }
+    // Other keys ignored
   }
 
   function boot() {

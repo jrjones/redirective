@@ -25,6 +25,16 @@ async fn main() -> Result<(), Error> {
 
     // Load configuration (links.yaml and service settings).
     let config = Config::load("links.yaml")?;
+    // Write out shortcodes list for client-side autocomplete
+    {
+        // Collect and sort shortcode keys
+        let mut codes: Vec<String> = config.links.keys().cloned().collect();
+        codes.sort();
+        let content = codes.join("\n");
+        if let Err(e) = std::fs::write("static_html/shortcodes.txt", content) {
+            tracing::error!("failed to write static_html/shortcodes.txt: {}", e);
+        }
+    }
     let cache = RouterCache::new(config.links);
 
     // Initialize metrics.
