@@ -2,7 +2,7 @@
 //! http module: HTTP server with Axum.
 
 use crate::cache::RouterCache;
-use crate::config::{ServiceConfig, Config};
+use crate::config::{Config, ServiceConfig};
 use crate::errors::Error;
 use crate::metrics::Metrics;
 
@@ -11,8 +11,8 @@ use crate::metrics::Metrics;
 /// Serves `/healthz`, `/version`, `/metrics`, and `/:code` endpoints.
 use axum::{
     Router,
-    extract::{Extension, Query, ConnectInfo},
-    http::{Uri, header, StatusCode},
+    extract::{ConnectInfo, Extension, Query},
+    http::{StatusCode, Uri, header},
     response::{IntoResponse, Redirect, Response},
     routing::{get, post},
 };
@@ -77,12 +77,19 @@ impl RateLimiter {
         }
     }
 }
-use std::{net::{SocketAddr, IpAddr}, time::{Instant, Duration}, sync::Arc, collections::HashMap};
-use tokio::sync::Mutex as TokioMutex;
-use tokio::task;
 use std::env;
 use std::process::Command;
+
+use std::{
+    collections::HashMap,
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+    time::{Duration, Instant},
+};
+
 use tokio::fs;
+use tokio::sync::Mutex as TokioMutex;
+use tokio::task;
 
 /// Internal application state
 #[derive(Clone)]
@@ -96,7 +103,12 @@ struct AppState {
 }
 
 /// Build the Axum application with routes and shared state.
-fn create_app(cache: RouterCache, metrics: Metrics, version: String, service: ServiceConfig) -> Router<()> {
+fn create_app(
+    cache: RouterCache,
+    metrics: Metrics,
+    version: String,
+    service: ServiceConfig,
+) -> Router<()> {
     let state = AppState {
         cache,
         metrics,

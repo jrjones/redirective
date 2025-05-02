@@ -38,8 +38,7 @@ async fn main() -> Result<(), Error> {
 
     // Initialize metrics.
     let metrics = metrics::init_metrics();
-
-
+    
     // Run the HTTP server.
     http::run_http_server(cache, metrics, config.service).await?;
 
