@@ -203,7 +203,8 @@ async fn spa_handler(Extension(state): Extension<AppState>, uri: Uri) -> Respons
             .redirect_latency
             .with_label_values(&[trimmed])
             .observe(elapsed);
-        return Redirect::temporary(&url).into_response();
+        // 302 Found redirect
+        return Redirect::to(&url).into_response();
     }
     // static file or directory
     let file_rel = if trimmed.is_empty() {
