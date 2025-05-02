@@ -75,7 +75,7 @@
       "<span class='yellowbold'>Compiling</span> cache.rs",
       "<span class='yellowbold'>Finished</span> `release` target(s) in 1.23s",
     ]),
-    clear: () => { term.innerHTML = "jrj.io redirective shell v1.0<br>Type 'help' for a list of commands."; newPrompt(); },
+    clear: () => { term.innerHTML = "jrj.io redirective shell v1.0<br>Type '<span class='clickable' data-command='help'>help</span>' for a list of commands."; newPrompt(); },
     open: (args) => {
       // If no argument, list available shortcodes
       if (!args[0]) {
@@ -422,7 +422,7 @@
 
   function boot() {
     // Add static introductory lines with normal spacing
-    term.innerHTML = `jrj.io redirective shell v1.0<br>Type 'help' for a list of commands.`;
+    term.innerHTML = `jrj.io redirective shell v1.0<br>Type '<span class='clickable' data-command='help'>help</span>' for a list of commands.`;
     newPrompt();
     // Add a 200ms delay before typing 'help' and pressing Enter
     setTimeout(() => {
