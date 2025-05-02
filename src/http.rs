@@ -13,7 +13,7 @@ use axum::{
     Router,
     extract::{ConnectInfo, Extension, Query},
     http::{StatusCode, Uri, header},
-    response::{IntoResponse, Redirect, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
 use mime_guess::from_path;
@@ -203,8 +203,9 @@ async fn spa_handler(Extension(state): Extension<AppState>, uri: Uri) -> Respons
             .redirect_latency
             .with_label_values(&[trimmed])
             .observe(elapsed);
-        // 302 Found redirect
-        return Redirect::to(&url).into_response();
+        // 302 Found redirect with Location header
+        let location = [(header::LOCATION, url.clone())];
+        return (StatusCode::FOUND, location).into_response();
     }
     // static file or directory
     let file_rel = if trimmed.is_empty() {
