@@ -261,7 +261,7 @@ async fn webhook_handler(
         {
             if status.success() {
                 if let Ok(cfg) = Config::load("links.yaml") {
-                    if let Ok(_) = env::current_dir() {
+                    if env::current_dir().is_ok() {
                         let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
                         codes.sort();
                         let content = codes.join("\n");
