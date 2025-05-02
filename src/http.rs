@@ -118,7 +118,9 @@ fn create_app(
             service.rate_limit_per_minute,
             service.rate_limit_per_day,
         )),
-        webhook_config: WebhookConfig { path: service.webhook_path.clone() },
+        webhook_config: WebhookConfig {
+            path: service.webhook_path.clone(),
+        },
     };
     let mut router = Router::new()
         .route("/healthz", get(healthz_handler))
@@ -129,7 +131,10 @@ fn create_app(
     // Webhook endpoint to trigger reload (POST) and reject other methods (405)
     router = router
         .route(&state.webhook_config.path, post(webhook_handler))
-        .route(&state.webhook_config.path, get(|| async { StatusCode::METHOD_NOT_ALLOWED }));
+        .route(
+            &state.webhook_config.path,
+            get(|| async { StatusCode::METHOD_NOT_ALLOWED }),
+        );
 
     router
         // Fallback to handle redirects, static files, or SPA index.html
