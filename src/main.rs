@@ -6,7 +6,6 @@
 mod cache;
 mod config;
 mod errors;
-mod git_sync;
 mod http;
 mod metrics;
 
@@ -40,13 +39,6 @@ async fn main() -> Result<(), Error> {
     // Initialize metrics.
     let metrics = metrics::init_metrics();
 
-    // Start Git sync background task.
-    git_sync::start_git_sync(
-        "links.yaml",
-        cache.clone(),
-        config.service.reload_interval_secs,
-        metrics.clone(),
-    );
 
     // Run the HTTP server.
     http::run_http_server(cache, metrics, config.service).await?;

@@ -1,7 +1,7 @@
 # Redirective
 &copy; Copyright 2025, [Joseph R. Jones](https://jrj.org) - MIT License
 
-Redirective is a stateless Rust micro-service that maps short codes to full URLs using an in-memory table sourced from a Git-backed YAML file. It exposes several HTTP endpoints:
+Redirective is a stateless[^1] Rust micro-service that maps short codes to full URLs using an in-memory table sourced from a Git-backed YAML file. It exposes several HTTP endpoints:
  - `GET /{code}`: 302 redirect to the target URL if found, otherwise 404.
  - `GET /healthz`: health check endpoint.
  - `GET /version`: service version endpoint.
@@ -70,4 +70,11 @@ docker run -p 8080:8080 redirective:latest
  This project uses GitHub Actions for CI. See `.github/workflows/ci.yml`.
  ## Documentation
  - [Architecture](.codex/architecture.md)
- - [PRD](.codex/prd.md)
+ 
+ ---
+
+[^1]: Endpoints are simple GETs; nothing writes user data back to the service. Cache is rebuilt from links.yaml at launch and hot-swapped with ArcSwap (no disk persistence). Background task does git pull --ff-only, then reloads config; failures don’t corrupt cache. Any container that can read the same repo will converge on the same cache; nothing local needs to be replicated... but arguably the the webhook doing a git pull COULD be considered state, but doesn't seem a useful distinction to me.
+
+
+
+

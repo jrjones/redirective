@@ -14,7 +14,7 @@ A stateless Rust micro‑service that maps `/{code}` to full URLs using an in‑
 | **HTTP Server** | Handles requests, performs 302 redirect, exposes health/version | `axum` + `hyper` |  | 
 | **Router Cache** | Thread‑safe `Arc<HashMap<String, String>>` providing O(1) lookup | `ArcSwap` |  | 
 | **Config Loader** | Parses `links.yaml` into map, validates schema | `serde_yaml` |  | 
-| **Git Sync Daemon** | Periodically `git pull --ff-only`; triggers hot reload on diff | `git2`, `tokio` task |  | 
+| **Reload Webhook Handler** | Receives HTTP POST on `/git-webhook`, enforces per-IP rate limits and serial mutex, runs `git pull --ff-only`, then reloads links on success | `axum`, `tokio`, `tokio::sync::Mutex` |  |
 | **Hot‑Reload Manager** | Atomically swaps map to avoid blocking readers | `ArcSwap`  |  | 
 | **Metrics & Logging** | Prometheus counters/histograms; JSON structured logs | `prometheus`, `tracing`, `tracing_subscriber` |  | 
 

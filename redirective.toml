@@ -1,6 +1,6 @@
  # redirective.toml - service settings
- address = "0.0.0.0:8080"
- reload_interval_secs = 60
- # TLS settings (optional, not in MVP)
- # cert_path = "/path/to/fullchain.pem"
- # key_path = "/path/to/privkey.pem"
+address = "0.0.0.0:8080"
+[webhook]
+path = "/git-webhook"
+rate_limit_per_minute = 1
+rate_limit_per_day = 100

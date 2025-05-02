@@ -7,11 +7,18 @@ use std::collections::HashMap;
 use std::fs;
 
 /// Service configuration parameters.
+#[derive(Clone)]
 pub struct ServiceConfig {
     /// The address (host:port) to bind the HTTP server to.
     pub address: String,
-    /// Reload interval in seconds for Git sync.
-    pub reload_interval_secs: u64,
+    /// (Deprecated) Reload interval no longer used; webhook triggers reload.
+    // pub reload_interval_secs: u64,
+    /// HTTP path for the reload webhook endpoint.
+    pub webhook_path: String,
+    /// Max reload webhook requests per minute per IP.
+    pub rate_limit_per_minute: u32,
+    /// Max reload webhook requests per day per IP.
+    pub rate_limit_per_day: u32,
 }
 
 /// Overall application configuration.
@@ -58,22 +65,39 @@ impl Config {
 
         // Read service settings from redirective.toml, if available
         #[derive(Deserialize)]
+        struct RawWebhookConfig {
+            path: Option<String>,
+            rate_limit_per_minute: Option<u32>,
+            rate_limit_per_day: Option<u32>,
+        }
+
+        #[derive(Deserialize)]
         struct RawServiceConfig {
             address: Option<String>,
-            reload_interval_secs: Option<u64>,
+            webhook: Option<RawWebhookConfig>,
         }
         // Default settings
         let mut service = ServiceConfig {
             address: "0.0.0.0:8080".to_string(),
-            reload_interval_secs: 60,
+            webhook_path: "/git-webhook".to_string(),
+            rate_limit_per_minute: 1,
+            rate_limit_per_day: 100,
         };
         if let Ok(toml_str) = fs::read_to_string("redirective.toml") {
             let raw: RawServiceConfig = toml::from_str(&toml_str)?;
             if let Some(addr) = raw.address {
                 service.address = addr;
             }
-            if let Some(interval) = raw.reload_interval_secs {
-                service.reload_interval_secs = interval;
+            if let Some(webhook_raw) = raw.webhook {
+                if let Some(path) = webhook_raw.path {
+                    service.webhook_path = path;
+                }
+                if let Some(min) = webhook_raw.rate_limit_per_minute {
+                    service.rate_limit_per_minute = min;
+                }
+                if let Some(day) = webhook_raw.rate_limit_per_day {
+                    service.rate_limit_per_day = day;
+                }
             }
         }
 
