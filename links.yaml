@@ -1,3 +1,3 @@
  # links.yaml - mapping of short codes to full URLs
- foo: https://example.com/ | optional comments per line, space-pipe-space as delimiter
- bar: https://example.com/
+ foo: https://example.com | optional comments per line, space-pipe-space as delimiter
+ bar: https://example.com
