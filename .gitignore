@@ -33,3 +33,7 @@ Thumbs.db
 
 # Backup files
 *~
+
+# Downloaded
+/redirective-links/
+/static_html/shortcodes.txt
