@@ -65,7 +65,12 @@ jobs:
         run: |
           status=$(curl -s -o /dev/null -w "%{http_code}" -I http://localhost:8080/foo)
           if [ "$status" != "302" ]; then echo "expected 302 for /foo, got $status"; exit 1; fi
-          location=$(curl -s -D - http://localhost:8080/foo | grep Location | awk '{print $2}')
-          if [ "$location" != "https://example.com" ]; then echo "location mismatch: $location"; exit 1; fi
+          # Extract the Location header (case-insensitive), strip CR, and normalize trailing slash
+          location=$(curl -s -D - http://localhost:8080/foo \
+                        | grep -i '^location:' \
+                        | awk '{print $2}' \
+                        | tr -d '\r')
+          got="${location%/}"
+          if [ "$got" != "https://example.com" ]; then echo "location mismatch: $location"; exit 1; fi
       - name: stop redirective container
         run: docker stop redirective_test
