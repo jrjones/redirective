@@ -19,5 +19,9 @@ COPY --from=builder /usr/src/app/links.yaml ./
 COPY --from=builder /usr/src/app/redirective.toml ./
 # Copy static files into the container
 COPY static_html ./static_html
+
+# Copy entrypoint script that installs SSH deploy key (if provided) and starts the app
+COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 EXPOSE 8080
-ENTRYPOINT ["/usr/local/bin/redirective"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

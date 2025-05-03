@@ -42,19 +42,24 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: build release
         run: cargo build --release
-      - name: Checkout links repo
-        uses: actions/checkout@v3
-        with:
-          repository: jrjones/redirective-links
-          token: ${{ secrets.LINKS_REPO_TOKEN }}
-          path: links
+      - name: Install deploy key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.LINKS_DEPLOY_KEY_B64 }}" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Clone links repo via SSH
+        run: |
+          git clone git@github.com:jrjones/redirective-links.git links
       - name: Copy links.yaml into workspace
         run: cp links/links.yaml links.yaml
       - name: build Docker image
         run: docker build . --file Dockerfile --tag redirective:latest
       - name: start redirective container
         run: |
-          docker run -d --name redirective_test -p 8080:8080 redirective:latest
+          docker run -d --name redirective_test \
+            -v ~/.ssh/id_ed25519:/run/secrets/links_deploy_key:ro \
+            -p 8080:8080 redirective:latest
       - name: wait for service to start
         run: sleep 5
       - name: healthz smoke-test

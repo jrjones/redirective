@@ -63,11 +63,18 @@ This creates a YAML file where each key is the YOURLS keyword and the value is t
  Build and run via Docker:
 ```bash
 docker build -t redirective:latest .
-docker run -p 8080:8080 redirective:latest
-```  
-// Or, to hot-reload against a local clone:
-// git clone https://github.com/jrjones/redirective-links.git ./redirective-links
-// docker run -v $PWD/redirective-links:/app -w /app -p 8080:8080 redirective:latest
+
+# Run with SSH deploy key:
+docker run -p 8080:8080 \
+  -v ~/.ssh/id_ed25519:/run/secrets/links_deploy_key:ro \
+  redirective:latest
+
+# Or, to hot-reload against a local clone:
+git clone git@github.com:jrjones/redirective-links.git ./redirective-links
+docker run -v "$PWD/redirective-links":/app \
+  -v ~/.ssh/id_ed25519:/run/secrets/links_deploy_key:ro \
+  -w /app -p 8080:8080 redirective:latest
+```
  ## CI
  This project uses GitHub Actions for CI. See `.github/workflows/ci.yml`.
  ## Documentation
