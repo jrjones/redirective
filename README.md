@@ -20,12 +20,12 @@ This project was done in part because I was using [Yourls](https://github.com/YO
 
 ## Features:
  - Thread-safe, lock-free reads with `ArcSwap`.
- - Hot-reload of mappings on file changes via Git sync daemon.
+ - Hot-reload of mappings on demand via an HTTP webhook (`POST /git-webhook` by default) that pulls the latest `links.yaml` from Git and reloads.
  - Prometheus metrics and structured JSON logging.
  
 ## Configuration
  - `links.yaml`: contains mappings from codes to URLs. Example provided.
- - `redirective.toml`: service settings (bind address, reload interval, TLS paths).
+ - `redirective.toml`: service settings (bind address, webhook path, rate limits).
  
 ## Development
 ## Utilities
