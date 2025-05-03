@@ -1,2 +1,6 @@
 links_sync_deploy
 links_sync_deploy.pub
+static_html/
+target/
+redirective-links/
+
