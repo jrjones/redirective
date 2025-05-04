@@ -30,32 +30,32 @@
       "  <span class='clickable' data-command='wally'>wally</span>            - who's a good boy?",
       "  <span class='clickable' data-command='clear'>clear</span>            – clear the screen",
       "  <span class='clickable' data-command='help'>help</span>             – show this list",
-      "  <span class='clickable' data-command='open [shortcode]'>open [shortcode]</span> – open url in new tab",
+      "  <span class='clickable' data-command='open'>open [shortcode]</span> – open url in new tab",
       " ",
     ]),
     what: () => printLines([
-      "JRJ's personal link shortener",
-      "Built in Rust <img src='./ferris.png' style='height: 1em;' class='clickable' data-command='rusty'>",
-      "Source: https://github.com/jrjones/redirective",
+      "<img src='./ferris.png' style='height: 2.5em; padding-right: 0.5em' class='clickable' data-command='rusty' align='left'>JRJ's personal link shortener",
+      "Built in Rust",
+      "Source: <span class='clickable'>https://github.com/jrjones/redirective</span>",
       "Type 'help' to explore.",
       " ",
     ].map(linkify)),
     about: () => printLines([
-      "Joseph R. Jones (JRJ)",
+      "<b>Joseph R. Jones</b> (JRJ)",
       "Scruffy-looking nerd herder",
       "and world's foremost expert",
       "in self-proclaimed thought leadership",
-      "https://jrj.org",
+      "<span class='clickable'>https://jrj.org</span>",
       " ",
     ].map(linkify)),
     contact: () => printLines([
-      "This is kind of one of those \"if you know, you know\" situations.",
-      "If I wanted you to contact me you would know how to contact me.",
+      "This is one of those \"if you know, you know\" situations.",
+      "If I wanted you to contact me you'd know how to contact me.",
       "",
       "That said, JRJ...",
-      " - Is on twitter/X as @jrj (but doesn’t really post anymore)",
-      " - Used to blog at https://blog.jrj.org (but the site is archived)",
-      " - Is on LinkedIn -> https://jrj.io/in (but doesn’t accept unknown connections)",
+      " - <b>Twitter/X</b> -> <span class='clickable'>https://x.com/jrj</span> (but doesn’t really post anymore)",
+      " - <b>JRJ Blog</b>  -> <span class='clickable'>https://blog.jrj.org</span> (but the site is archived)",
+      " - <b>LinkedIn</b>  -> <span class='clickable'>https://jrj.io/in</span> (but doesn’t accept unknown connections)",
       " ",
     ].map(linkify)),
     wally: () => printLines([
@@ -99,9 +99,26 @@
     },
 
     ls: (args) => {
-      const files = ["ascii.txt", "ferris.png", "index.html", "jrjconsole.js", "styles.css", "wally.png"];
-      const links = files.map(f => `<a href="${f}" target="_blank">${f}</a>`);
-      printLines([links.join("  "), " "]);  
+      if (args.length > 0) {
+        // Detailed directory listing with only filenames clickable
+        const detailedListing = [
+          "total 5936",
+          "drwxr-xr-x   9 jrj  staff   288B May  1 20:17 .",
+          "drwxr-xr-x  20 jrj  staff   640B May  3 22:04 ..",
+          `-rw-r--r--@  1 jrj  staff   4.6K Apr 29 20:33 <a href="ascii.txt" target="_blank" class="clickable">ascii.txt</a>`,
+          `-rw-r--r--   1 jrj  staff    45K Apr 29 17:20 <a href="ferris.png" target="_blank" class="clickable">ferris.png</a>`,
+          `-rw-r--r--@  1 jrj  staff   473B Apr 29 21:24 <a href="index.html" target="_blank" class="clickable">index.html</a>`,
+          `-rw-r--r--@  1 jrj  staff    15K May  3 22:43 <a href="jrjconsole.js" target="_blank" class="clickable">jrjconsole.js</a>`,
+          `-rw-r--r--@  1 jrj  staff   2.6K May  3 22:31 <a href="styles.css" target="_blank" class="clickable">styles.css</a>`,
+          `-rw-------@  1 jrj  staff   2.8M Apr 29 00:33 <a href="wally.png" target="_blank" class="clickable">wally.png</a>`,
+        ];
+        printLines(detailedListing.concat([" "]));
+      } else {
+        // Default file listing with clickable links
+        const files = ["ascii.txt", "ferris.png", "index.html", "jrjconsole.js", "styles.css", "wally.png"];
+        const links = files.map(f => `<a href="${f}" target="_blank" class="clickable">${f}</a>`);
+        printLines([links.join("  "), " "]);
+      }
     },
     pwd: () => printLines([
       "/home/jrj",
@@ -135,11 +152,11 @@
     rmdir: (args) => printLines([]),
     rm: (args) => printLines([]),
     touch: (args) => printLines([]),
-    // Hidden fun hacker-detection commands
+    // Hidden hacker-detection commands
     su: () => {
       printLinesThen([
-        "<span style='color:red'>Security Alert: Unauthorized access detected!</span>",
-        `<span style='color:red'>IP address: ${randomIP()}</span>`,
+        "<span class='terminal-red'>Security Alert: Unauthorized su attempt detected!</span>",
+        `<span class='terminal-red'>IP address: ${randomIP()}</span>`,
         " "
       ], () => {
         setTimeout(() => {
@@ -147,15 +164,16 @@
             .then(res => res.text())
             .then(text => {
               const lines = text.split(/\\r?\\n/);
-              printLines(lines);
+              const redLines = lines.map(line => `<span class="terminal-red">${line}</span>`);
+              printLines(redLines);
             });
         }, 1000);
       });
     },
     sudo: (args) => {
       printLinesThen([
-        "<span style='color:red'>Security Alert: Unauthorized sudo access detected!</span>",
-        `<span style='color:red'>IP address: ${randomIP()}</span>`,
+        "<span class='terminal-red'>Security Alert: Unauthorized sudo attempt detected!</span>",
+        `<span class='terminal-red'>IP address: ${randomIP()}</span>`,
         " "
       ], () => {
         setTimeout(() => {
@@ -163,7 +181,8 @@
             .then(res => res.text())
             .then(text => {
               const lines = text.split(/\\r?\\n/);
-              printLines(lines);
+              const redLines = lines.map(line => `<span class="terminal-red">${line}</span>`);
+              printLines(redLines);
             });
         }, 1000);
       });
@@ -438,7 +457,13 @@
     const el = e.target.closest(".clickable");
     if (el) {
       const command = el.dataset.command || el.textContent.trim();
-      typeChars(command, () => handleKey({ key: "Enter", preventDefault: () => {} })); // Type the command and press Enter
+      if (command.startsWith("open")) {
+        // For the "open" command, type the command followed by a space
+        typeChars(command + " ");
+      } else {
+        // For other commands, type the command and press Enter
+        typeChars(command, () => handleKey({ key: "Enter", preventDefault: () => {} }));
+      }
     }
   });
 

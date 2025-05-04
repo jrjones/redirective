@@ -18,7 +18,7 @@ html, body {
   font-size: calc(100vw / 60); /* Dynamically adjust font size */
   line-height: 1.4;
   overflow: auto; /* Allow scrolling */
-  background: #090909;
+  background: #000000;
   padding: 20px; /* Add padding for the content */
 }
 body::before {
@@ -63,18 +63,30 @@ body::before {
   0%, 49% { opacity: 1; }
   50%, 100% { opacity: 0; }
 }
-.clickable { text-decoration: underline; cursor: pointer; color: aqua; }
-a { color: inherit; text-decoration: underline; }
-.yellowbold { color: #ffcc00; font-weight: bold;}
+.clickable { text-decoration: underline; cursor: pointer; color: aqua; 
+    text-shadow: 0 0 8px rgba(51, 200, 251, 0.9) !important
+}
+a { color: inherit; text-decoration: underline; 
+  text-shadow: 0 0 8px rgba(51, 200, 251, 0.9) !important
+}
+.yellowbold { 
+  color: #ffcc00; font-weight: bold;
+  text-shadow: 0 0 8px rgba(224, 224, 51, 0.9) !important;
+}
 img {
-  filter: hue-rotate(90deg) saturate(50%); /* Muted green tint */
+  filter: hue-rotate(90deg) saturate(50%) drop-shadow(0 0 8px rgba(0, 125, 0, 0.9)); /* Combine both effects */
 }
 /* Ghost autocomplete text: semi-transparent to appear darker */
 .ghost {
   /* Dark green for inline autocomplete */
   color: rgba(0, 128, 0, 1) !important;
 }
+
 /* Subtle CRT text glow */
 #terminal, #terminal * {
   text-shadow: 0 0 8px rgba(51, 255, 51, 0.9);
+} 
+#terminal .terminal-red {
+  text-shadow: 0 0 8px rgba(255, 51, 51, 0.9);
+  color: red !important
 }
