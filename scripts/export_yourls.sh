@@ -16,10 +16,11 @@ else
         echo "Error: mysql client not found. Install mysql-client or set YOURLS_DOCKER_CONTAINER." >&2
         exit 1
     fi
-    DB_CMD=(mysql --protocol=TCP -h "$YOURLS_DB_HOST" -P "$YOURLS_DB_PORT" -u "$YOURLS_DB_USER" -p"$YOURLS_DB_PASS")
+    DB_CMD=(mysql --protocol=TCP -h "$YOURLS_DB_HOST" -P "${YOURLS_DB_PORT:-3306}" -u "$YOURLS_DB_USER" -p"$YOURLS_DB_PASS")
 fi
 
 # Export YOURLS mappings to a YAML file suitable for Redirective
+# Uses the new YAML comment format (standard # comments) instead of the legacy pipe-delimited format
 #
 # Environment variables required:
 #   YOURLS_DB_HOST   - MySQL host for YOURLS database
@@ -38,9 +39,9 @@ fi
 "${DB_CMD[@]}" "$YOURLS_DB_NAME" -Nse \
     "SELECT keyword, url, IFNULL(title, '') FROM yourls_url ORDER BY keyword;" |
 while IFS=$'\t' read -r key url title; do
-    # Output as YAML mapping, append title as comment if present
+    # Output as YAML mapping, append title as standard YAML comment if present
     if [[ -n "$title" ]]; then
-        echo "${key}: ${url} | ${title}"
+        echo "${key}: ${url} # ${title}"
     else
         echo "${key}: ${url}"
     fi

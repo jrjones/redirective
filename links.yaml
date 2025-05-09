@@ -1,3 +1,4 @@
- # links.yaml - mapping of short codes to full URLs
- foo: https://example.com | optional comments per line, space-pipe-space as delimiter
- bar: https://example.com
+# links.yaml - mapping of short codes to full URLs
+foo: https://example.com # Comments are now standard YAML comments
+bar: https://example.org
+test: https://test.example.com
