@@ -80,7 +80,7 @@ sequenceDiagram
 - Web UI with analytics.
 - S3‑backed `links.yaml` for environments without Git.=
 
-_Open questions_: query‑string passthrough rules, default redirect when code missing, acceptable reload interval default (e.g., 60 s vs webhook).
+_Open questions_: query‑string passthrough rules_
 
 ## 11. Non-Goals
 - Multi‑tenant namespaces - this is just for me. Want this? Fork it. Pull requests for multitenant will be rejected.
