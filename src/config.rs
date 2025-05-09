@@ -75,13 +75,13 @@ impl Config {
     pub fn load(links_path: &str) -> Result<Self, Error> {
         // Read links file and parse mappings
         let content = fs::read_to_string(links_path)?;
-        
+
         // Parse YAML using serde_yaml
         let links_data: Links = serde_yaml::from_str(&content)
             .map_err(|e| Error::Config(format!("Failed to parse YAML: {}", e)))?;
-            
+
         let links = links_data.links;
-        
+
         // Validate URLs are not empty
         for (key, url) in &links {
             if url.trim().is_empty() {
@@ -96,7 +96,7 @@ impl Config {
             rate_limit_per_minute: default_rate_limit_minute(),
             rate_limit_per_day: default_rate_limit_day(),
         };
-        
+
         // Read service settings from redirective.toml, if available
         if let Ok(toml_str) = fs::read_to_string("redirective.toml") {
             let raw: RawServiceConfig = toml::from_str(&toml_str)?;
