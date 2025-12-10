@@ -20,7 +20,8 @@ if [ -f /run/secrets/links_deploy_key ]; then
     git init
     git remote add origin "$LINKS_REPO"
     git fetch origin main
-    # Checkout main branch tracking origin/main for future pulls
+    # Remove bundled links.yaml to allow checkout, then checkout main tracking origin
+    rm -f links.yaml
     git checkout -b main origin/main
     echo "Links repository initialized."
   fi
