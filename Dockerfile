@@ -10,7 +10,7 @@ RUN cargo build --release
 # Stage 2: runtime (with git for git-sync)
 FROM debian:bookworm-slim
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git ca-certificates wget \
+    && apt-get install -y --no-install-recommends git ca-certificates wget openssh-client \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 # Copy binary and config files
