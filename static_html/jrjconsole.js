@@ -25,7 +25,7 @@
     help: () => printLines([
       "Available commands:",
       "  <span class='clickable' data-command='what'>what</span>             – info about this service",
-      "  <span class='clickable' data-command='about'>about</span>            – about JRJ",
+      "  <span class='clickable' data-command='who'>who</span>              – about JRJ",
       "  <span class='clickable' data-command='where'>where</span>            – contact JRJ",
       "  <span class='clickable' data-command='wally'>wally</span>            - who's a good boy?",
       "  <span class='clickable' data-command='clear'>clear</span>            – clear the screen",
@@ -40,7 +40,7 @@
       "Type 'help' to explore.",
       " ",
     ].map(linkify)),
-    about: () => printLines([
+    who: () => printLines([
       "<b>Joseph R. Jones</b> (JRJ)",
       "Scruffy-looking nerd herder (retired)",
       "and world's foremost expert in",
