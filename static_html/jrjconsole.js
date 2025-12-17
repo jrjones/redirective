@@ -24,13 +24,12 @@
   const COMMANDS = {
     help: () => printLines([
       "Available commands:",
-      "  <span class='clickable' data-command='what'>what</span>             – info about this service",
-      "  <span class='clickable' data-command='who'>who</span>              – about JRJ",
+      "  <span class='clickable' data-command='what'>what</span>              – info about this service",
+      "  <span class='clickable' data-command='who'>who</span>                – about JRJ",
       "  <span class='clickable' data-command='where'>where</span>            – contact JRJ",
       "  <span class='clickable' data-command='wally'>wally</span>            - who's a good boy?",
       "  <span class='clickable' data-command='clear'>clear</span>            – clear the screen",
-      "  <span class='clickable' data-command='help'>help</span>             – show this list",
-      "  <span class='clickable' data-command='open'>open [shortcode]</span> – open url in new tab",
+      "  <span class='clickable' data-command='help'>help</span>              – show this list",
       " ",
     ]),
     what: () => printLines([
