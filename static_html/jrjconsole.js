@@ -26,7 +26,7 @@
       "Available commands:",
       "  <span class='clickable' data-command='what'>what</span>             – info about this service",
       "  <span class='clickable' data-command='about'>about</span>            – about JRJ",
-      "  <span class='clickable' data-command='contact'>contact</span>          – how to reach JRJ",
+      "  <span class='clickable' data-command='where'>where</span>            – contact JRJ",
       "  <span class='clickable' data-command='wally'>wally</span>            - who's a good boy?",
       "  <span class='clickable' data-command='clear'>clear</span>            – clear the screen",
       "  <span class='clickable' data-command='help'>help</span>             – show this list",
@@ -36,19 +36,19 @@
     what: () => printLines([
       "<img src='./ferris.png' style='height: 2.5em; padding-right: 0.5em' class='clickable' data-command='rusty' align='left'>JRJ's personal link shortener",
       "Built in Rust",
-      "Source: <span class='clickable'>https://github.com/jrjones/redirective</span>",
+      "<span class='clickable'>https://github.com/jrjones/redirective</span>",
       "Type 'help' to explore.",
       " ",
     ].map(linkify)),
     about: () => printLines([
       "<b>Joseph R. Jones</b> (JRJ)",
-      "Scruffy-looking nerd herder",
-      "and world's foremost expert",
-      "in self-proclaimed thought leadership",
+      "Scruffy-looking nerd herder (retired)",
+      "and world's foremost expert in",
+      "self-proclaimed thought leadership",
       "<span class='clickable'>https://jrj.org</span>",
       " ",
     ].map(linkify)),
-    contact: () => printLines([
+    where: () => printLines([
       "This is one of those \"if you know, you know\" situations.",
       "If I wanted you to contact me you'd know how to contact me.",
       "",
