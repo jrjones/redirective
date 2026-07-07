@@ -4,3 +4,7 @@ address = "0.0.0.0:8080"
 path = "/git-webhook"
 rate_limit_per_minute = 1
 rate_limit_per_day = 100
+# Optional: relay reload webhooks to a peer node after a successful reload.
+# The relayed request carries the X-Redirective-Relay header, which prevents
+# relay loops (a relayed request is never relayed again). Absent = disabled.
+# peer_url = "https://tatooine.rimrock.systems/git-webhook"
