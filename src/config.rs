@@ -31,6 +31,10 @@ pub struct ServiceConfig {
     /// Max reload webhook requests per day per IP.
     #[serde(default = "default_rate_limit_day")]
     pub rate_limit_per_day: u32,
+    /// Optional peer webhook URL to relay reload webhooks to (e.g. the
+    /// standby node's `/git-webhook` endpoint). Absent = relay disabled.
+    #[serde(default)]
+    pub peer_url: Option<String>,
 }
 
 fn default_address() -> String {
@@ -62,6 +66,7 @@ struct RawWebhookConfig {
     path: Option<String>,
     rate_limit_per_minute: Option<u32>,
     rate_limit_per_day: Option<u32>,
+    peer_url: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -95,6 +100,7 @@ impl Config {
             webhook_path: default_webhook_path(),
             rate_limit_per_minute: default_rate_limit_minute(),
             rate_limit_per_day: default_rate_limit_day(),
+            peer_url: None,
         };
 
         // Read service settings from redirective.toml, if available
@@ -112,6 +118,9 @@ impl Config {
                 }
                 if let Some(day) = webhook_raw.rate_limit_per_day {
                     service.rate_limit_per_day = day;
+                }
+                if let Some(peer) = webhook_raw.peer_url {
+                    service.peer_url = Some(peer);
                 }
             }
         }

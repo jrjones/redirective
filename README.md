@@ -21,11 +21,37 @@ This project was done in part because I was using [Yourls](https://github.com/YO
 ## Features:
  - Thread-safe, lock-free reads with `ArcSwap`.
  - Hot-reload of mappings on demand via an HTTP webhook (`POST /git-webhook` by default) that pulls the latest `links.yaml` from Git and reloads.
+ - Optional webhook peer relay for multi-node deployments (see below).
  - Prometheus metrics and structured JSON logging.
- 
+
+### Hot-reload peer relay
+
+In an active/standby deployment (e.g. two nodes behind DNS failover), GitHub delivers a single push webhook, which only reaches the active node — the standby's link table would go stale. Setting `peer_url` in the `[webhook]` section makes a node relay the webhook to its peer **after a successful reload**:
+
+ - The relayed request is a `POST` to `peer_url` carrying the header `X-Redirective-Relay: 1`, sent fire-and-forget with a 5-second timeout. Relay failures are logged and counted (`relay_success` / `relay_fail` metrics) but never affect the webhook response or the local reload.
+ - A request that arrives **with** `X-Redirective-Relay` is never relayed again. This makes the config loop-free even when both nodes point at each other: node A relays to node B, node B reloads and stops.
+ - Failed reloads are not relayed.
+ - `peer_url` absent (the default) disables the feature entirely.
+
+Symmetric two-node example — on `corellia`:
+
+```toml
+[webhook]
+peer_url = "https://tatooine.rimrock.systems/git-webhook"
+```
+
+and on `tatooine`:
+
+```toml
+[webhook]
+peer_url = "https://corellia.rimrock.systems/git-webhook"
+```
+
+The URL must be reachable node-to-node (if public hostnames only resolve through a proxy/CDN, use a direct or private address instead). Relayed requests pass through the normal webhook rate limiter on the receiving node.
+
 ## Configuration
  - `links.yaml`: contains mappings from codes to URLs. Example provided.
- - `redirective.toml`: service settings (bind address, webhook path, rate limits).
+ - `redirective.toml`: service settings (bind address, webhook path, rate limits, optional `peer_url` for the webhook peer relay).
  
 ## Development
 ## Utilities

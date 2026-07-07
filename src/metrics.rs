@@ -15,6 +15,10 @@ pub struct Metrics {
     pub reload_success: IntCounter,
     /// Counter of failed config reloads.
     pub reload_fail: IntCounter,
+    /// Counter of successful webhook relays to the peer node.
+    pub relay_success: IntCounter,
+    /// Counter of failed webhook relays to the peer node.
+    pub relay_fail: IntCounter,
     /// The registry holding all metrics.
     pub registry: Arc<Registry>,
 }
@@ -56,11 +60,28 @@ pub fn init_metrics() -> Metrics {
     registry
         .register(Box::new(reload_fail.clone()))
         .expect("failed to register reload_fail");
+    // Counter of successful peer relays
+    let relay_success = IntCounter::new(
+        "relay_success",
+        "Counter of successful webhook relays to peer",
+    )
+    .expect("failed to create relay_success metric");
+    registry
+        .register(Box::new(relay_success.clone()))
+        .expect("failed to register relay_success");
+    // Counter of failed peer relays
+    let relay_fail = IntCounter::new("relay_fail", "Counter of failed webhook relays to peer")
+        .expect("failed to create relay_fail metric");
+    registry
+        .register(Box::new(relay_fail.clone()))
+        .expect("failed to register relay_fail");
     Metrics {
         redirect_total,
         redirect_latency,
         reload_success,
         reload_fail,
+        relay_success,
+        relay_fail,
         registry: Arc::new(registry),
     }
 }
@@ -80,12 +101,16 @@ mod tests {
             .observe(0.0);
         metrics.reload_success.inc();
         metrics.reload_fail.inc();
+        metrics.relay_success.inc();
+        metrics.relay_fail.inc();
         let families = metrics.registry.gather();
         let names: Vec<_> = families.iter().map(|f| f.name()).collect();
         // Ensure counters are registered
         assert!(names.contains(&"redirect_total"));
         assert!(names.contains(&"reload_success"));
         assert!(names.contains(&"reload_fail"));
+        assert!(names.contains(&"relay_success"));
+        assert!(names.contains(&"relay_fail"));
         // Histogram produces bucket, sum, and count families
         assert!(
             names

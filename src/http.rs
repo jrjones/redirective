@@ -12,7 +12,7 @@ use crate::metrics::Metrics;
 use axum::{
     Router,
     extract::{ConnectInfo, Extension, Query},
-    http::{StatusCode, Uri, header},
+    http::{HeaderMap, StatusCode, Uri, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -20,10 +20,22 @@ use mime_guess::from_path;
 use prometheus::{Encoder, TextEncoder};
 use serde::Deserialize;
 use std::path::Path as FsPath;
+
+/// Header marking a webhook request as relayed from a peer node.
+/// Requests carrying this header are never relayed again (loop prevention).
+const RELAY_HEADER: &str = "x-redirective-relay";
+
+/// Path to the git binary used for reload pulls.
+const GIT_BINARY: &str = "/usr/bin/git";
+
+/// Timeout for relaying the webhook to the peer node.
+const RELAY_TIMEOUT: Duration = Duration::from_secs(5);
+
 /// Configuration for the reload webhook.
 #[derive(Clone)]
 struct WebhookConfig {
     path: String,
+    peer_url: Option<String>,
 }
 
 /// Rate limit information per client IP.
@@ -120,6 +132,7 @@ fn create_app(
         )),
         webhook_config: WebhookConfig {
             path: service.webhook_path.clone(),
+            peer_url: service.peer_url.clone(),
         },
     };
     let mut router = Router::new()
@@ -240,39 +253,88 @@ async fn spa_handler(Extension(state): Extension<AppState>, uri: Uri) -> Respons
         .into_response()
 }
 
-/// Webhook endpoint to trigger a git pull and reload.
-async fn webhook_handler(
-    ConnectInfo(addr): ConnectInfo<SocketAddr>,
-    Extension(state): Extension<AppState>,
-) -> impl IntoResponse {
-    let ip = addr.ip();
-    if !state.rate_limiter.allow(ip).await {
-        return StatusCode::TOO_MANY_REQUESTS.into_response();
+/// Decide whether this webhook should be relayed to a peer.
+///
+/// Returns the peer URL to relay to when `peer_url` is configured and the
+/// incoming request did not itself arrive via relay (no `X-Redirective-Relay`
+/// header). A relayed request is never relayed again, so two nodes pointing
+/// at each other cannot loop.
+fn relay_target(peer_url: Option<&str>, headers: &HeaderMap) -> Option<String> {
+    match peer_url {
+        Some(url) if !headers.contains_key(RELAY_HEADER) => Some(url.to_string()),
+        _ => None,
     }
-    let reload_mutex = state.reload_mutex.clone();
-    let cache = state.cache.clone();
-    let metrics = state.metrics.clone();
-    task::spawn(async move {
-        let _guard = reload_mutex.lock().await;
-        let repo_dir = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let git_binary = "/usr/bin/git";
-        if let Ok(status) = Command::new(git_binary)
-            .current_dir(&repo_dir)
-            .args(["pull", "--ff-only"])
-            .status()
-        {
-            if status.success() {
-                if let Ok(cfg) = Config::load("links.yaml") {
-                    if env::current_dir().is_ok() {
-                        let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
-                        codes.sort();
-                        let content = codes.join("\n");
-                        let _ = std::fs::write("static_html/shortcodes.txt", &content);
-                    }
-                    cache.swap(cfg.links);
-                    metrics.reload_success.inc();
-                } else {
-                    metrics.reload_fail.inc();
+}
+
+/// Fire a relay POST to the peer's webhook endpoint, marking it with the
+/// relay-guard header. Failures are logged and counted but never propagate.
+async fn relay_to_peer(peer_url: &str, metrics: &Metrics) {
+    let request = hyper::Request::builder()
+        .method(hyper::Method::POST)
+        .uri(peer_url)
+        .header(RELAY_HEADER, "1")
+        .body(hyper::Body::empty());
+    let request = match request {
+        Ok(req) => req,
+        Err(e) => {
+            tracing::error!(peer = peer_url, error = %e, "invalid peer_url; relay skipped");
+            metrics.relay_fail.inc();
+            return;
+        }
+    };
+    let client = hyper::Client::builder().build(hyper_tls::HttpsConnector::new());
+    match tokio::time::timeout(RELAY_TIMEOUT, client.request(request)).await {
+        Ok(Ok(resp)) if resp.status().is_success() => {
+            tracing::info!(peer = peer_url, status = %resp.status(), "relayed webhook to peer");
+            metrics.relay_success.inc();
+        }
+        Ok(Ok(resp)) => {
+            tracing::warn!(peer = peer_url, status = %resp.status(), "peer relay rejected");
+            metrics.relay_fail.inc();
+        }
+        Ok(Err(e)) => {
+            tracing::warn!(peer = peer_url, error = %e, "peer relay failed");
+            metrics.relay_fail.inc();
+        }
+        Err(_) => {
+            tracing::warn!(
+                peer = peer_url,
+                timeout_secs = RELAY_TIMEOUT.as_secs(),
+                "peer relay timed out"
+            );
+            metrics.relay_fail.inc();
+        }
+    }
+}
+
+/// Run a git pull and reload the link table, then (only on a successful
+/// reload) relay the webhook to `relay_target`, if any. Relay failures do
+/// not affect the reload outcome.
+async fn reload_and_relay(
+    cache: RouterCache,
+    metrics: Metrics,
+    relay_target: Option<String>,
+    git_binary: &str,
+) {
+    let repo_dir = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+    if let Ok(status) = Command::new(git_binary)
+        .current_dir(&repo_dir)
+        .args(["pull", "--ff-only"])
+        .status()
+    {
+        if status.success() {
+            if let Ok(cfg) = Config::load("links.yaml") {
+                if env::current_dir().is_ok() {
+                    let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
+                    codes.sort();
+                    let content = codes.join("\n");
+                    let _ = std::fs::write("static_html/shortcodes.txt", &content);
+                }
+                cache.swap(cfg.links);
+                metrics.reload_success.inc();
+                // Only a successful reload propagates to the peer.
+                if let Some(peer_url) = relay_target {
+                    relay_to_peer(&peer_url, &metrics).await;
                 }
             } else {
                 metrics.reload_fail.inc();
@@ -280,6 +342,28 @@ async fn webhook_handler(
         } else {
             metrics.reload_fail.inc();
         }
+    } else {
+        metrics.reload_fail.inc();
+    }
+}
+
+/// Webhook endpoint to trigger a git pull and reload.
+async fn webhook_handler(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    Extension(state): Extension<AppState>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let ip = addr.ip();
+    if !state.rate_limiter.allow(ip).await {
+        return StatusCode::TOO_MANY_REQUESTS.into_response();
+    }
+    let relay_target = relay_target(state.webhook_config.peer_url.as_deref(), &headers);
+    let reload_mutex = state.reload_mutex.clone();
+    let cache = state.cache.clone();
+    let metrics = state.metrics.clone();
+    task::spawn(async move {
+        let _guard = reload_mutex.lock().await;
+        reload_and_relay(cache, metrics, relay_target, GIT_BINARY).await;
     });
     StatusCode::ACCEPTED.into_response()
 }
@@ -317,6 +401,7 @@ mod tests {
             webhook_path: "/git-webhook".to_string(),
             rate_limit_per_minute: 1,
             rate_limit_per_day: 100,
+            peer_url: None,
         }
     }
 
@@ -402,5 +487,111 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let body = to_bytes(response.into_body()).await.unwrap();
         assert_eq!(&body[..], b"false");
+    }
+
+    /// Spawn a mock peer webhook server on an ephemeral port. Returns its
+    /// webhook URL and a log of the headers of every request it receives.
+    async fn spawn_mock_peer() -> (String, Arc<TokioMutex<Vec<HeaderMap>>>) {
+        let received: Arc<TokioMutex<Vec<HeaderMap>>> = Arc::new(TokioMutex::new(Vec::new()));
+        let log = received.clone();
+        let app = Router::new().route(
+            "/git-webhook",
+            post(move |headers: HeaderMap| {
+                let log = log.clone();
+                async move {
+                    log.lock().await.push(headers);
+                    StatusCode::ACCEPTED
+                }
+            }),
+        );
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let addr = listener.local_addr().unwrap();
+        tokio::spawn(
+            axum::Server::from_tcp(listener)
+                .unwrap()
+                .serve(app.into_make_service()),
+        );
+        (format!("http://{}/git-webhook", addr), received)
+    }
+
+    #[test]
+    fn test_relay_target_set_when_peer_configured_and_no_guard() {
+        let headers = HeaderMap::new();
+        assert_eq!(
+            relay_target(Some("http://peer/git-webhook"), &headers),
+            Some("http://peer/git-webhook".to_string())
+        );
+    }
+
+    #[test]
+    fn test_relay_target_none_when_guard_header_present() {
+        let mut headers = HeaderMap::new();
+        headers.insert(RELAY_HEADER, "1".parse().unwrap());
+        assert_eq!(
+            relay_target(Some("http://peer/git-webhook"), &headers),
+            None
+        );
+    }
+
+    #[test]
+    fn test_relay_target_none_when_peer_absent() {
+        let headers = HeaderMap::new();
+        assert_eq!(relay_target(None, &headers), None);
+    }
+
+    #[tokio::test]
+    async fn test_relay_fires_after_successful_reload() {
+        let (peer_url, received) = spawn_mock_peer().await;
+        let cache = RouterCache::new(HashMap::new());
+        let metrics = init_metrics();
+        // /usr/bin/true stands in for a git pull that succeeds.
+        reload_and_relay(cache, metrics.clone(), Some(peer_url), "/usr/bin/true").await;
+        assert_eq!(metrics.reload_success.get(), 1);
+        assert_eq!(metrics.relay_success.get(), 1);
+        assert_eq!(metrics.relay_fail.get(), 0);
+        let requests = received.lock().await;
+        assert_eq!(requests.len(), 1);
+        // The relayed request must carry the guard header so the peer
+        // does not relay it back (loop prevention).
+        assert_eq!(requests[0].get(RELAY_HEADER).unwrap(), "1");
+    }
+
+    #[tokio::test]
+    async fn test_no_relay_when_target_none() {
+        let cache = RouterCache::new(HashMap::new());
+        let metrics = init_metrics();
+        reload_and_relay(cache, metrics.clone(), None, "/usr/bin/true").await;
+        assert_eq!(metrics.reload_success.get(), 1);
+        assert_eq!(metrics.relay_success.get(), 0);
+        assert_eq!(metrics.relay_fail.get(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_no_relay_on_failed_reload() {
+        let (peer_url, received) = spawn_mock_peer().await;
+        let cache = RouterCache::new(HashMap::new());
+        let metrics = init_metrics();
+        // /usr/bin/false stands in for a git pull that fails.
+        reload_and_relay(cache, metrics.clone(), Some(peer_url), "/usr/bin/false").await;
+        assert_eq!(metrics.reload_fail.get(), 1);
+        assert_eq!(metrics.relay_success.get(), 0);
+        assert_eq!(metrics.relay_fail.get(), 0);
+        assert!(received.lock().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_relay_failure_counted_but_reload_still_succeeds() {
+        // Bind then drop a listener to get a port with nothing listening.
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        let cache = RouterCache::new(HashMap::new());
+        let metrics = init_metrics();
+        let peer_url = format!("http://{}/git-webhook", addr);
+        reload_and_relay(cache, metrics.clone(), Some(peer_url), "/usr/bin/true").await;
+        assert_eq!(metrics.reload_success.get(), 1);
+        assert_eq!(metrics.relay_success.get(), 0);
+        assert_eq!(metrics.relay_fail.get(), 1);
     }
 }
