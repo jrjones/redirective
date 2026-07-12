@@ -17,14 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       # Must match Dockerfile's `FROM rust:<ver>-slim` and rust-toolchain.toml — see the
-      # comment in rust-toolchain.toml. `stable` + `override: true` floated CI ahead of
-      # the image (clippy on a newer stable demanded let-chains that the older builder
-      # cannot compile), and a floating channel also lets an unrelated Rust release break
-      # this repo's CI with no change of ours.
+      # comment in rust-toolchain.toml. A floating `stable` also lets an unrelated Rust
+      # release break this repo's CI with no change of ours.
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: "1.86"
+          toolchain: "1.97"
           profile: minimal
           override: true
           components: clippy, rustfmt

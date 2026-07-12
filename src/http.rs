@@ -445,10 +445,10 @@ async fn reload_and_relay(
     relay_target: Option<String>,
     git_binary: &str,
 ) {
-    if reload_links(&cache, &metrics, git_binary).await.is_some() {
-        if let Some(peer_url) = relay_target {
-            relay_to_peer(&peer_url, &metrics).await;
-        }
+    if reload_links(&cache, &metrics, git_binary).await.is_some()
+        && let Some(peer_url) = relay_target
+    {
+        relay_to_peer(&peer_url, &metrics).await;
     }
 }
 
