@@ -1,0 +1,6 @@
+[toolchain]
+# Match Dockerfile's `FROM rust:1.86-slim`. A newer local toolchain silently accepts
+# language features (let-chains, stabilized in 1.88) that the release build rejects,
+# so `cargo test` passes on a laptop while `cargo build --release` fails in CI.
+channel = "1.86"
+components = ["clippy", "rustfmt"]

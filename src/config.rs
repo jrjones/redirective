@@ -140,10 +140,10 @@ impl Config {
                     service.peer_url = Some(peer);
                 }
             }
-            if let Some(poll_raw) = raw.poll
-                && let Some(secs) = poll_raw.interval_secs
-            {
-                service.poll_interval_secs = Some(secs);
+            if let Some(poll_raw) = raw.poll {
+                if let Some(secs) = poll_raw.interval_secs {
+                    service.poll_interval_secs = Some(secs);
+                }
             }
         }
 
