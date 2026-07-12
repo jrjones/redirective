@@ -53,6 +53,11 @@ struct RateLimiter {
     per_day: u32,
 }
 
+/// A client is considered stale, and evicted from the rate limiter map, once
+/// its day window has been idle this long (i.e. it hasn't made a request in
+/// over a day).
+const RATE_LIMIT_DAY_WINDOW: Duration = Duration::from_secs(60 * 60 * 24);
+
 impl RateLimiter {
     fn new(per_minute: u32, per_day: u32) -> Self {
         RateLimiter {
@@ -66,6 +71,12 @@ impl RateLimiter {
     async fn allow(&self, ip: IpAddr) -> bool {
         let now = Instant::now();
         let mut clients = self.clients.lock().await;
+        // Evict stale entries for other clients before growing the map.
+        // `ip` itself is kept regardless so the window-reset logic below can
+        // run on it normally.
+        clients.retain(|&other, info| {
+            other == ip || now.duration_since(info.day_window_start) < RATE_LIMIT_DAY_WINDOW
+        });
         let info = clients.entry(ip).or_insert(RateInfo {
             minute_count: 0,
             minute_window_start: now,
@@ -76,7 +87,7 @@ impl RateLimiter {
             info.minute_window_start = now;
             info.minute_count = 0;
         }
-        if now.duration_since(info.day_window_start) >= Duration::from_secs(60 * 60 * 24) {
+        if now.duration_since(info.day_window_start) >= RATE_LIMIT_DAY_WINDOW {
             info.day_window_start = now;
             info.day_count = 0;
         }
@@ -114,18 +125,21 @@ struct AppState {
     webhook_config: WebhookConfig,
 }
 
-/// Build the Axum application with routes and shared state.
+/// Build the Axum application with routes and shared state. `reload_mutex`
+/// is shared with the background poll task (see `spawn_poll_task`) so the
+/// two reload triggers never race each other's `git pull`.
 fn create_app(
     cache: RouterCache,
     metrics: Metrics,
     version: String,
     service: ServiceConfig,
+    reload_mutex: Arc<TokioMutex<()>>,
 ) -> Router<()> {
     let state = AppState {
         cache,
         metrics,
         version,
-        reload_mutex: Arc::new(TokioMutex::new(())),
+        reload_mutex,
         rate_limiter: Arc::new(RateLimiter::new(
             service.rate_limit_per_minute,
             service.rate_limit_per_day,
@@ -253,6 +267,67 @@ async fn spa_handler(Extension(state): Extension<AppState>, uri: Uri) -> Respons
         .into_response()
 }
 
+/// Returns true if `peer` is loopback or an RFC1918/unique-local private
+/// address, i.e. it can only be our own nginx sitting in front of us.
+///
+/// There's no explicit trusted-proxy list in this codebase; nginx always
+/// reaches us over the docker bridge or loopback, so "peer is private" is an
+/// adequate proxy for "peer is our nginx" without adding a config knob.
+fn is_trusted_proxy(peer: IpAddr) -> bool {
+    match peer {
+        IpAddr::V4(v4) => v4.is_loopback() || v4.is_private(),
+        IpAddr::V6(v6) => {
+            if v6.is_loopback() {
+                true
+            } else if let Some(mapped) = v6.to_ipv4_mapped() {
+                mapped.is_loopback() || mapped.is_private()
+            } else {
+                // fc00::/7 (unique local).
+                (v6.segments()[0] & 0xfe00) == 0xfc00
+            }
+        }
+    }
+}
+
+/// Extract a single IP address from a header value, treating a
+/// missing/empty/unparseable value as absent.
+fn header_ip(headers: &HeaderMap, name: &str) -> Option<IpAddr> {
+    headers
+        .get(name)
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<IpAddr>().ok())
+}
+
+/// Resolve the real client IP for rate-limiting purposes.
+///
+/// Only trusts `X-Real-IP`/`X-Forwarded-For` when `peer` (the TCP peer) is
+/// our own nginx (see `is_trusted_proxy`); a public peer means the request
+/// didn't come through our proxy, so its headers could be spoofed and are
+/// ignored in favor of the peer address itself. nginx sets
+/// `X-Real-IP $http_cf_connecting_ip`, which is empty for non-CloudFlare
+/// (tailnet) requests, so an empty header is treated the same as absent.
+fn resolve_client_ip(peer: IpAddr, headers: &HeaderMap) -> IpAddr {
+    if !is_trusted_proxy(peer) {
+        return peer;
+    }
+    if let Some(ip) = header_ip(headers, "x-real-ip") {
+        return ip;
+    }
+    let xff_first = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .and_then(|s| s.parse::<IpAddr>().ok());
+    if let Some(ip) = xff_first {
+        return ip;
+    }
+    peer
+}
+
 /// Decide whether this webhook should be relayed to a peer.
 ///
 /// Returns the peer URL to relay to when `peer_url` is configured and the
@@ -307,6 +382,60 @@ async fn relay_to_peer(peer_url: &str, metrics: &Metrics) {
     }
 }
 
+/// Run `git rev-parse HEAD` in `repo_dir`, returning the trimmed commit hash
+/// on success. Used only to detect whether a pull actually moved HEAD.
+fn git_head(git_binary: &str, repo_dir: &std::path::Path) -> Option<String> {
+    Command::new(git_binary)
+        .current_dir(repo_dir)
+        .args(["rev-parse", "HEAD"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+}
+
+/// Run `git pull --ff-only` and, on success, reload the link table from
+/// `links.yaml` into `cache`.
+///
+/// Returns `Some(changed)` on a successful reload, where `changed` reports
+/// whether the pull actually moved HEAD (useful for quiet-steady-state
+/// logging), or `None` if the pull or the reload failed. Metrics are
+/// incremented here so every caller gets consistent accounting.
+async fn reload_links(cache: &RouterCache, metrics: &Metrics, git_binary: &str) -> Option<bool> {
+    let repo_dir = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+
+    let before = git_head(git_binary, &repo_dir);
+
+    let pulled = Command::new(git_binary)
+        .current_dir(&repo_dir)
+        .args(["pull", "--ff-only"])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    if !pulled {
+        metrics.reload_fail.inc();
+        return None;
+    }
+
+    let cfg = match Config::load("links.yaml") {
+        Ok(cfg) => cfg,
+        Err(_) => {
+            metrics.reload_fail.inc();
+            return None;
+        }
+    };
+
+    let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
+    codes.sort();
+    let _ = std::fs::write("static_html/shortcodes.txt", codes.join("\n"));
+    cache.swap(cfg.links);
+    metrics.reload_success.inc();
+
+    let after = git_head(git_binary, &repo_dir);
+    Some(before.is_some() && after != before)
+}
+
 /// Run a git pull and reload the link table, then (only on a successful
 /// reload) relay the webhook to `relay_target`, if any. Relay failures do
 /// not affect the reload outcome.
@@ -316,35 +445,55 @@ async fn reload_and_relay(
     relay_target: Option<String>,
     git_binary: &str,
 ) {
-    let repo_dir = env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-    if let Ok(status) = Command::new(git_binary)
-        .current_dir(&repo_dir)
-        .args(["pull", "--ff-only"])
-        .status()
+    if reload_links(&cache, &metrics, git_binary).await.is_some()
+        && let Some(peer_url) = relay_target
     {
-        if status.success() {
-            if let Ok(cfg) = Config::load("links.yaml") {
-                if env::current_dir().is_ok() {
-                    let mut codes: Vec<String> = cfg.links.keys().cloned().collect();
-                    codes.sort();
-                    let content = codes.join("\n");
-                    let _ = std::fs::write("static_html/shortcodes.txt", &content);
-                }
-                cache.swap(cfg.links);
-                metrics.reload_success.inc();
-                // Only a successful reload propagates to the peer.
-                if let Some(peer_url) = relay_target {
-                    relay_to_peer(&peer_url, &metrics).await;
-                }
-            } else {
-                metrics.reload_fail.inc();
-            }
-        } else {
-            metrics.reload_fail.inc();
-        }
-    } else {
-        metrics.reload_fail.inc();
+        relay_to_peer(&peer_url, &metrics).await;
     }
+}
+
+/// Convert a configured poll interval into a `Duration`, treating `None` or
+/// `0` as "polling disabled". Kept side-effect free so it can be unit
+/// tested without touching tokio's clock.
+fn poll_interval(poll_interval_secs: Option<u64>) -> Option<Duration> {
+    match poll_interval_secs {
+        None | Some(0) => None,
+        Some(secs) => Some(Duration::from_secs(secs)),
+    }
+}
+
+/// Spawn the background git-poll reload task, if `poll_interval_secs`
+/// enables it. Shares `reload_mutex` with the webhook handler so a poll and
+/// a webhook-triggered reload never run `git pull` concurrently.
+fn spawn_poll_task(
+    cache: RouterCache,
+    metrics: Metrics,
+    reload_mutex: Arc<TokioMutex<()>>,
+    poll_interval_secs: Option<u64>,
+) {
+    let Some(interval) = poll_interval(poll_interval_secs) else {
+        tracing::info!("git-poll reload disabled (poll_interval_secs unset or 0)");
+        return;
+    };
+    tracing::info!(
+        interval_secs = interval.as_secs(),
+        "git-poll reload enabled"
+    );
+    task::spawn(async move {
+        let mut ticker = tokio::time::interval(interval);
+        // The first tick fires immediately; links are already fresh from
+        // startup, so skip it and only reload on subsequent ticks.
+        ticker.tick().await;
+        loop {
+            ticker.tick().await;
+            let _guard = reload_mutex.lock().await;
+            match reload_links(&cache, &metrics, GIT_BINARY).await {
+                Some(true) => tracing::info!("git-poll reload: links changed"),
+                Some(false) => {}
+                None => tracing::warn!("git-poll reload: pull or reload failed"),
+            }
+        }
+    });
 }
 
 /// Webhook endpoint to trigger a git pull and reload.
@@ -353,7 +502,7 @@ async fn webhook_handler(
     Extension(state): Extension<AppState>,
     headers: HeaderMap,
 ) -> impl IntoResponse {
-    let ip = addr.ip();
+    let ip = resolve_client_ip(addr.ip(), &headers);
     if !state.rate_limiter.allow(ip).await {
         return StatusCode::TOO_MANY_REQUESTS.into_response();
     }
@@ -375,7 +524,14 @@ pub async fn run_http_server(
     service: ServiceConfig,
 ) -> Result<(), Error> {
     let version = env!("CARGO_PKG_VERSION").to_string();
-    let app = create_app(cache, metrics, version, service.clone());
+    let reload_mutex = Arc::new(TokioMutex::new(()));
+    spawn_poll_task(
+        cache.clone(),
+        metrics.clone(),
+        reload_mutex.clone(),
+        service.poll_interval_secs,
+    );
+    let app = create_app(cache, metrics, version, service.clone(), reload_mutex);
     let addr: SocketAddr = service.address.parse()?;
     axum::Server::bind(&addr)
         .serve(app.into_make_service_with_connect_info::<SocketAddr>())
@@ -402,14 +558,25 @@ mod tests {
             rate_limit_per_minute: 1,
             rate_limit_per_day: 100,
             peer_url: None,
+            poll_interval_secs: None,
         }
+    }
+
+    fn new_reload_mutex() -> Arc<TokioMutex<()>> {
+        Arc::new(TokioMutex::new(()))
     }
 
     #[tokio::test]
     async fn test_healthz() {
         let cache = RouterCache::new(HashMap::new());
         let metrics = init_metrics();
-        let app = create_app(cache, metrics, "1.2.3".to_string(), default_service());
+        let app = create_app(
+            cache,
+            metrics,
+            "1.2.3".to_string(),
+            default_service(),
+            new_reload_mutex(),
+        );
         let response = app
             .clone()
             .oneshot(
@@ -429,7 +596,13 @@ mod tests {
     async fn test_version() {
         let cache = RouterCache::new(HashMap::new());
         let metrics = init_metrics();
-        let app = create_app(cache, metrics, "vX.Y".to_string(), default_service());
+        let app = create_app(
+            cache,
+            metrics,
+            "vX.Y".to_string(),
+            default_service(),
+            new_reload_mutex(),
+        );
         let response = app
             .clone()
             .oneshot(
@@ -451,7 +624,13 @@ mod tests {
         map.insert("foo".to_string(), "http://example.com".to_string());
         let cache = RouterCache::new(map);
         let metrics = init_metrics();
-        let app = create_app(cache, metrics, "1.0".to_string(), default_service());
+        let app = create_app(
+            cache,
+            metrics,
+            "1.0".to_string(),
+            default_service(),
+            new_reload_mutex(),
+        );
         let response = app
             .clone()
             .oneshot(
@@ -473,7 +652,13 @@ mod tests {
         map.insert("foo".to_string(), "http://example.com".to_string());
         let cache = RouterCache::new(map);
         let metrics = init_metrics();
-        let app = create_app(cache, metrics, "1.0".to_string(), default_service());
+        let app = create_app(
+            cache,
+            metrics,
+            "1.0".to_string(),
+            default_service(),
+            new_reload_mutex(),
+        );
         let response = app
             .clone()
             .oneshot(
@@ -593,5 +778,144 @@ mod tests {
         assert_eq!(metrics.reload_success.get(), 1);
         assert_eq!(metrics.relay_success.get(), 0);
         assert_eq!(metrics.relay_fail.get(), 1);
+    }
+
+    fn loopback_peer() -> IpAddr {
+        IpAddr::from([127, 0, 0, 1])
+    }
+
+    fn public_peer() -> IpAddr {
+        IpAddr::from([203, 0, 113, 5])
+    }
+
+    #[test]
+    fn test_is_trusted_proxy_loopback_and_private() {
+        assert!(is_trusted_proxy(loopback_peer()));
+        assert!(is_trusted_proxy(IpAddr::from([10, 0, 0, 5])));
+        assert!(is_trusted_proxy(IpAddr::from([172, 17, 0, 2])));
+        assert!(is_trusted_proxy(IpAddr::from([192, 168, 1, 1])));
+        assert!(is_trusted_proxy(std::net::Ipv6Addr::LOCALHOST.into()));
+    }
+
+    #[test]
+    fn test_is_trusted_proxy_public_is_not_trusted() {
+        assert!(!is_trusted_proxy(public_peer()));
+    }
+
+    #[test]
+    fn test_resolve_client_ip_honors_x_real_ip_from_loopback() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", "203.0.113.9".parse().unwrap());
+        assert_eq!(
+            resolve_client_ip(loopback_peer(), &headers),
+            IpAddr::from([203, 0, 113, 9])
+        );
+    }
+
+    #[test]
+    fn test_resolve_client_ip_ignores_spoofed_header_from_public_peer() {
+        let mut headers = HeaderMap::new();
+        headers.insert("x-real-ip", "203.0.113.9".parse().unwrap());
+        // A public peer isn't our nginx, so the header must be ignored and
+        // the peer address used instead - otherwise any caller could set
+        // X-Real-IP and bypass the rate limiter entirely.
+        assert_eq!(resolve_client_ip(public_peer(), &headers), public_peer());
+    }
+
+    #[test]
+    fn test_resolve_client_ip_uses_leftmost_xff_entry() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-forwarded-for",
+            "203.0.113.9, 10.0.0.1, 10.0.0.2".parse().unwrap(),
+        );
+        assert_eq!(
+            resolve_client_ip(loopback_peer(), &headers),
+            IpAddr::from([203, 0, 113, 9])
+        );
+    }
+
+    #[test]
+    fn test_resolve_client_ip_empty_header_treated_as_absent() {
+        let mut headers = HeaderMap::new();
+        // nginx sets X-Real-IP to $http_cf_connecting_ip, which is empty for
+        // non-CloudFlare (tailnet) traffic.
+        headers.insert("x-real-ip", "".parse().unwrap());
+        headers.insert("x-forwarded-for", "10.0.0.7".parse().unwrap());
+        assert_eq!(
+            resolve_client_ip(loopback_peer(), &headers),
+            IpAddr::from([10, 0, 0, 7])
+        );
+    }
+
+    #[test]
+    fn test_resolve_client_ip_falls_back_to_peer_when_no_headers() {
+        let headers = HeaderMap::new();
+        assert_eq!(
+            resolve_client_ip(loopback_peer(), &headers),
+            loopback_peer()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_allows_n_then_blocks_nplus1() {
+        let limiter = RateLimiter::new(2, 100);
+        let ip = IpAddr::from([192, 168, 1, 50]);
+        assert!(limiter.allow(ip).await);
+        assert!(limiter.allow(ip).await);
+        assert!(!limiter.allow(ip).await);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_tracks_ips_independently() {
+        let limiter = RateLimiter::new(1, 100);
+        let a = IpAddr::from([192, 168, 1, 1]);
+        let b = IpAddr::from([192, 168, 1, 2]);
+        assert!(limiter.allow(a).await);
+        assert!(!limiter.allow(a).await);
+        // A different IP has its own budget.
+        assert!(limiter.allow(b).await);
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_evicts_stale_entries() {
+        let limiter = RateLimiter::new(10, 100);
+        let stale_ip = IpAddr::from([192, 168, 1, 99]);
+        let now = Instant::now();
+        let stale_start = now
+            .checked_sub(RATE_LIMIT_DAY_WINDOW + Duration::from_secs(1))
+            .expect("test process has been up over a day");
+        {
+            let mut clients = limiter.clients.lock().await;
+            clients.insert(
+                stale_ip,
+                RateInfo {
+                    minute_count: 5,
+                    minute_window_start: stale_start,
+                    day_count: 5,
+                    day_window_start: stale_start,
+                },
+            );
+        }
+        let fresh_ip = IpAddr::from([192, 168, 1, 100]);
+        assert!(limiter.allow(fresh_ip).await);
+        let clients = limiter.clients.lock().await;
+        assert!(!clients.contains_key(&stale_ip));
+        assert!(clients.contains_key(&fresh_ip));
+    }
+
+    #[test]
+    fn test_poll_interval_none_when_unset() {
+        assert_eq!(poll_interval(None), None);
+    }
+
+    #[test]
+    fn test_poll_interval_none_when_zero() {
+        assert_eq!(poll_interval(Some(0)), None);
+    }
+
+    #[test]
+    fn test_poll_interval_some_when_positive() {
+        assert_eq!(poll_interval(Some(60)), Some(Duration::from_secs(60)));
     }
 }
