@@ -1,10 +1,26 @@
  # redirective.toml - service settings
 address = "0.0.0.0:8080"
+
+# Every setting below can also be set via a REDIRECTIVE_* env var, which
+# takes precedence over this file (see src/config.rs). Env vars:
+# REDIRECTIVE_POLL_INTERVAL_SECS, REDIRECTIVE_RATE_LIMIT_PER_MINUTE,
+# REDIRECTIVE_RATE_LIMIT_PER_DAY, REDIRECTIVE_PEER_URL.
+
+[poll]
+# Each node independently `git pull`s and reloads links.yaml on this
+# interval, so both cluster nodes converge without depending on the
+# webhook. 0 (or omitting this section) disables polling.
+interval_secs = 60
+
 [webhook]
 path = "/git-webhook"
-rate_limit_per_minute = 1
+# The webhook is an optional accelerator now that polling exists; its only
+# callers are CI/deploy, so a generous limit costs nothing.
+rate_limit_per_minute = 30
 rate_limit_per_day = 100
 # Optional: relay reload webhooks to a peer node after a successful reload.
 # The relayed request carries the X-Redirective-Relay header, which prevents
 # relay loops (a relayed request is never relayed again). Absent = disabled.
+# Not set in prod: the fleet is off-tailnet and nginx 444s direct-IP hits,
+# so a reachable peer path needs new nginx/firewall work polling avoids.
 # peer_url = "https://tatooine.rimrock.systems/git-webhook"

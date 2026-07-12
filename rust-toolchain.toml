@@ -1,0 +1,11 @@
+[toolchain]
+# THREE places pin the toolchain and they must move together: this file, Dockerfile's
+# `FROM rust:1.97-slim`, and .github/workflows/ci.yml.
+#
+# They used to disagree: CI floated on `stable` while the image built on 1.86. A laptop
+# and CI would then accept language features (let-chains, stabilized in 1.88) that the
+# release build rejects, while clippy on the newer stable actively DEMANDS them
+# (collapsible_if) — so satisfying one broke the other. Pinning all three down to 1.86
+# was not an option either: cargo-audit now requires 1.88+.
+channel = "1.97"
+components = ["clippy", "rustfmt"]
